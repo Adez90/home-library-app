@@ -12,6 +12,8 @@ const addBookSchema = z
     isbn: z.string().min(8).optional(),
     title: z.string().min(1).optional(),
     authorName: z.string().min(1).optional(),
+    seriesName: z.string().min(1).optional(),
+    volumeNumber: z.coerce.number().int().positive().optional(),
     status: z.enum(STATUSES).default('owned'),
   })
   .refine((data) => data.isbn || data.title, { message: 'Provide either isbn or title' });
@@ -77,7 +79,8 @@ export async function registerBookRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Invalid input', details: parsed.error.flatten() });
     }
-    const { isbn, title, authorName, status } = parsed.data;
+    const { isbn, title, authorName, seriesName: manualSeriesName, volumeNumber: manualVolumeNumber, status } =
+      parsed.data;
     const householdId = await getPrimaryHouseholdId(request.user.userId);
 
     const normalizedIsbn = isbn ? normalizeIsbn(isbn) : undefined;
@@ -118,6 +121,10 @@ export async function registerBookRoutes(app: FastifyInstance) {
       if (!resolvedTitle) {
         return reply.code(404).send({ error: 'No book found for that ISBN. Try entering the title manually.' });
       }
+
+      // Manual series info always wins — it's what the person is telling us, not a guess.
+      seriesName = manualSeriesName ?? seriesName;
+      volumeNumber = manualVolumeNumber ?? volumeNumber;
 
       book = await prisma.$transaction(async (tx) => {
         const author = resolvedAuthorName ? await findOrCreateAuthor(tx, resolvedAuthorName) : null;

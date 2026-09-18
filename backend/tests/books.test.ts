@@ -111,6 +111,22 @@ describe('household books', () => {
     expect(lookupByIsbn).not.toHaveBeenCalled();
   });
 
+  it('accepts a manual series name and volume number', async () => {
+    const { cookie } = await registerUser(app, 'g@example.com');
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { title: 'Book Four', seriesName: 'The Lantern Cycle', volumeNumber: 4 },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body.book.series.name).toBe('The Lantern Cycle');
+    expect(body.book.volumeNumber).toBe(4);
+  });
+
   it('rejects adding the same book twice', async () => {
     vi.mocked(lookupByIsbn).mockResolvedValue({ title: 'Dup Book', source: 'open-library', isbn13: '9780000000099' });
     const { cookie } = await registerUser(app, 'e@example.com');
