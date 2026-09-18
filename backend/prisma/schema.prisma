@@ -23,7 +23,9 @@ model Household {
   inviteCode String   @unique
   createdAt  DateTime @default(now())
 
-  members HouseholdMember[]
+  members        HouseholdMember[]
+  householdBooks HouseholdBook[]
+  favorites      Favorite[]
 }
 
 model HouseholdMember {
@@ -37,4 +39,66 @@ model HouseholdMember {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([householdId, userId])
+}
+
+model Author {
+  id         String  @id @default(uuid())
+  name       String
+  wikidataId String?
+
+  books Book[]
+
+  @@unique([name])
+}
+
+model Series {
+  id         String  @id @default(uuid())
+  name       String
+  wikidataId String?
+
+  books Book[]
+
+  @@unique([name])
+}
+
+model Book {
+  id           String   @id @default(uuid())
+  isbn13       String?  @unique
+  isbn10       String?
+  title        String
+  authorId     String?
+  seriesId     String?
+  volumeNumber Int?
+  coverUrl     String?
+  createdAt    DateTime @default(now())
+
+  author         Author?         @relation(fields: [authorId], references: [id])
+  series         Series?         @relation(fields: [seriesId], references: [id])
+  householdBooks HouseholdBook[]
+}
+
+model HouseholdBook {
+  id            String   @id @default(uuid())
+  householdId   String
+  bookId        String
+  status        String   @default("owned") // owned | wishlist | hunting
+  conditionNote String?
+  addedAt       DateTime @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  book      Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, bookId])
+}
+
+model Favorite {
+  id          String   @id @default(uuid())
+  householdId String
+  targetType  String // author | series
+  targetId    String
+  createdAt   DateTime @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, targetType, targetId])
 }

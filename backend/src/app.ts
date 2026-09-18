@@ -2,6 +2,9 @@ import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import jwt from '@fastify/jwt';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerBookRoutes } from './routes/books.js';
+import { registerSeriesRoutes } from './routes/series.js';
+import { registerFavoriteRoutes } from './routes/favorites.js';
 
 export function buildApp() {
   const app = Fastify({ logger: false });
@@ -23,6 +26,9 @@ export function buildApp() {
   app.get('/health', async () => ({ status: 'ok' }));
 
   app.register(registerAuthRoutes, { prefix: '/auth' });
+  app.register(registerBookRoutes);
+  app.register(registerSeriesRoutes);
+  app.register(registerFavoriteRoutes);
 
   return app;
 }
