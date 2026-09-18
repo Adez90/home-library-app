@@ -1,0 +1,12 @@
+{
+  "name": "home-library-app",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "web"
+  ],
+  "scripts": {
+    "backend:dev": "npm run dev --workspace backend",
+    "backend:test": "npm run test --workspace backend"
+  }
+}
