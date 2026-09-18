@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { api, ApiError } from '../lib/api'
 import type { SeriesDetail } from '../lib/types'
 import { StatusBadge } from '../components/StatusBadge'
+import { LanguageBadge } from '../components/LanguageBadge'
 import { ChevronLeftIcon, HeartIcon } from '../components/icons'
 
 export function SeriesDetailPage() {
@@ -10,6 +11,7 @@ export function SeriesDetailPage() {
   const [series, setSeries] = useState<SeriesDetail | null>(null)
   const [favoriting, setFavoriting] = useState(false)
   const [favorited, setFavorited] = useState(false)
+  const [languageFilter, setLanguageFilter] = useState<string | 'all'>('all')
 
   useEffect(() => {
     if (!id) return
@@ -32,7 +34,13 @@ export function SeriesDetailPage() {
 
   if (!series) return <p className="text-sm text-text-secondary">Loading…</p>
 
-  const pct = series.totalCount > 0 ? Math.round((series.ownedCount / series.totalCount) * 100) : 0
+  const visibleVolumes =
+    languageFilter === 'all' ? series.volumes : series.volumes.filter((v) => v.language === languageFilter)
+
+  const ownedCount =
+    languageFilter === 'all' ? series.ownedCount : visibleVolumes.filter((v) => v.status === 'owned').length
+  const totalCount = languageFilter === 'all' ? series.totalCount : visibleVolumes.length
+  const pct = totalCount > 0 ? Math.round((ownedCount / totalCount) * 100) : 0
 
   return (
     <div className="max-w-md flex flex-col gap-5">
@@ -51,7 +59,7 @@ export function SeriesDetailPage() {
       <div>
         <div className="flex items-center justify-between text-sm mb-1">
           <span className="font-semibold">
-            {series.ownedCount} of {series.totalCount} owned
+            {ownedCount} of {totalCount} owned
           </span>
           <span className="text-text-secondary">{pct}%</span>
         </div>
@@ -60,12 +68,39 @@ export function SeriesDetailPage() {
         </div>
       </div>
 
+      {series.languages.length > 1 && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => setLanguageFilter('all')}
+            className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ${
+              languageFilter === 'all' ? 'bg-text text-white' : 'bg-surface border border-border text-text-secondary'
+            }`}
+          >
+            All languages
+          </button>
+          {series.languages.map((lang) => (
+            <button
+              key={lang}
+              onClick={() => setLanguageFilter(lang)}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-semibold uppercase ${
+                languageFilter === lang ? 'bg-text text-white' : 'bg-surface border border-border text-text-secondary'
+              }`}
+            >
+              {lang}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
-        {series.volumes.map((v) => (
+        {visibleVolumes.map((v) => (
           <div key={v.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5">
-            <div className="flex-1 text-sm font-semibold">
-              {v.volumeNumber != null ? `Book ${v.volumeNumber}: ` : ''}
-              {v.title}
+            <div className="flex-1 text-sm font-semibold flex items-center gap-2">
+              <span>
+                {v.volumeNumber != null ? `Book ${v.volumeNumber}: ` : ''}
+                {v.title}
+              </span>
+              <LanguageBadge language={v.language} />
             </div>
             <StatusBadge status={v.status} />
           </div>

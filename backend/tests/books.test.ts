@@ -127,6 +127,59 @@ describe('household books', () => {
     expect(body.book.volumeNumber).toBe(4);
   });
 
+  it('reuses the same catalog row when two different households manually add the identical book', async () => {
+    const alice = await registerUser(app, 'alice@example.com');
+    const bob = await registerUser(app, 'bob@example.com');
+    const payload = {
+      title: 'Book Five: Winters Door',
+      authorName: 'Mira Voss',
+      seriesName: 'The Lantern Cycle',
+      volumeNumber: 5,
+      language: 'en',
+    };
+
+    const aliceAdd = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: alice.cookie },
+      payload,
+    });
+    const bobAdd = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: bob.cookie },
+      payload,
+    });
+
+    expect(aliceAdd.statusCode).toBe(201);
+    expect(bobAdd.statusCode).toBe(201);
+    expect(bobAdd.json().book.id).toBe(aliceAdd.json().book.id);
+  });
+
+  it('does not merge the same manual title across different languages', async () => {
+    const { cookie } = await registerUser(app, 'bilingual@example.com');
+    const base = { title: 'Throne of Glass', authorName: 'Sarah J. Maas' };
+
+    const english = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { ...base, language: 'en' },
+    });
+    const swedish = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { ...base, language: 'sv' },
+    });
+
+    expect(english.statusCode).toBe(201);
+    expect(swedish.statusCode).toBe(201);
+    expect(english.json().book.id).not.toBe(swedish.json().book.id);
+    expect(english.json().book.language).toBe('en');
+    expect(swedish.json().book.language).toBe('sv');
+  });
+
   it('rejects adding the same book twice', async () => {
     vi.mocked(lookupByIsbn).mockResolvedValue({ title: 'Dup Book', source: 'open-library', isbn13: '9780000000099' });
     const { cookie } = await registerUser(app, 'e@example.com');

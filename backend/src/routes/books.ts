@@ -14,6 +14,7 @@ const addBookSchema = z
     authorName: z.string().min(1).optional(),
     seriesName: z.string().min(1).optional(),
     volumeNumber: z.coerce.number().int().positive().optional(),
+    language: z.string().min(2).max(8).optional(),
     status: z.enum(STATUSES).default('owned'),
   })
   .refine((data) => data.isbn || data.title, { message: 'Provide either isbn or title' });
@@ -35,6 +36,28 @@ async function findOrCreateSeries(tx: Prisma.TransactionClient, name: string) {
   return tx.series.upsert({ where: { name }, update: {}, create: { name } });
 }
 
+// Only reachable when there's no ISBN to key off (manual entry, or a scanned ISBN with no
+// metadata match). Reuses an existing catalog row with an exact match on the fields that
+// distinguish one edition from another, so two "the same book" manual adds — by the same
+// household or a different one — don't create duplicate rows. Different languages are
+// legitimately different editions and are NOT merged.
+async function findExistingBookByDetails(
+  tx: Prisma.TransactionClient,
+  details: { title: string; authorId: string | null; seriesId: string | null; volumeNumber: number | null; language: string | null },
+) {
+  return tx.book.findFirst({
+    where: {
+      title: { equals: details.title, mode: 'insensitive' },
+      authorId: details.authorId,
+      seriesId: details.seriesId,
+      volumeNumber: details.volumeNumber,
+      language: details.language,
+      isbn13: null,
+      isbn10: null,
+    },
+  });
+}
+
 const bookInclude = { author: true, series: true } as const;
 
 function serializeHouseholdBook(hb: {
@@ -49,6 +72,7 @@ function serializeHouseholdBook(hb: {
     isbn10: string | null;
     coverUrl: string | null;
     volumeNumber: number | null;
+    language: string | null;
     author: { id: string; name: string } | null;
     series: { id: string; name: string } | null;
   };
@@ -65,6 +89,7 @@ function serializeHouseholdBook(hb: {
       isbn10: hb.book.isbn10,
       coverUrl: hb.book.coverUrl,
       volumeNumber: hb.book.volumeNumber,
+      language: hb.book.language,
       author: hb.book.author,
       series: hb.book.series,
     },
@@ -79,8 +104,15 @@ export async function registerBookRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Invalid input', details: parsed.error.flatten() });
     }
-    const { isbn, title, authorName, seriesName: manualSeriesName, volumeNumber: manualVolumeNumber, status } =
-      parsed.data;
+    const {
+      isbn,
+      title,
+      authorName,
+      seriesName: manualSeriesName,
+      volumeNumber: manualVolumeNumber,
+      language: manualLanguage,
+      status,
+    } = parsed.data;
     const householdId = await getPrimaryHouseholdId(request.user.userId);
 
     const normalizedIsbn = isbn ? normalizeIsbn(isbn) : undefined;
@@ -94,6 +126,7 @@ export async function registerBookRoutes(app: FastifyInstance) {
       let resolvedAuthorName = authorName;
       let seriesName: string | undefined;
       let volumeNumber: number | undefined;
+      let language: string | undefined;
       let coverUrl: string | undefined;
       let isbn13: string | undefined;
       let isbn10: string | undefined;
@@ -105,6 +138,7 @@ export async function registerBookRoutes(app: FastifyInstance) {
           resolvedAuthorName = metadata.authorName ?? resolvedAuthorName;
           seriesName = metadata.seriesName;
           volumeNumber = metadata.volumeNumber;
+          language = metadata.language;
           coverUrl = metadata.coverUrl;
           isbn13 = metadata.isbn13 ?? (normalizedIsbn.length === 13 ? normalizedIsbn : undefined);
           isbn10 = metadata.isbn10 ?? (normalizedIsbn.length === 10 ? normalizedIsbn : undefined);
@@ -122,13 +156,28 @@ export async function registerBookRoutes(app: FastifyInstance) {
         return reply.code(404).send({ error: 'No book found for that ISBN. Try entering the title manually.' });
       }
 
-      // Manual series info always wins — it's what the person is telling us, not a guess.
+      // Manual series/language info always wins — it's what the person is telling us, not a guess.
       seriesName = manualSeriesName ?? seriesName;
       volumeNumber = manualVolumeNumber ?? volumeNumber;
+      language = manualLanguage ?? language;
 
       book = await prisma.$transaction(async (tx) => {
         const author = resolvedAuthorName ? await findOrCreateAuthor(tx, resolvedAuthorName) : null;
         const series = seriesName ? await findOrCreateSeries(tx, seriesName) : null;
+
+        // No ISBN to key off (manual entry, or a scan whose ISBN had no metadata match) —
+        // reuse an existing exact match instead of creating a duplicate catalog row.
+        if (!isbn13 && !isbn10) {
+          const existingManual = await findExistingBookByDetails(tx, {
+            title: resolvedTitle!,
+            authorId: author?.id ?? null,
+            seriesId: series?.id ?? null,
+            volumeNumber: volumeNumber ?? null,
+            language: language ?? null,
+          });
+          if (existingManual) return existingManual;
+        }
+
         return tx.book.create({
           data: {
             title: resolvedTitle!,
@@ -136,6 +185,7 @@ export async function registerBookRoutes(app: FastifyInstance) {
             isbn10,
             coverUrl,
             volumeNumber,
+            language,
             authorId: author?.id,
             seriesId: series?.id,
           },

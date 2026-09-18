@@ -16,6 +16,7 @@ const item: HouseholdBook = {
     isbn10: null,
     coverUrl: null,
     volumeNumber: 3,
+    language: 'en',
     author: { id: 'a1', name: 'Mira Voss' },
     series: null,
   },
@@ -31,6 +32,7 @@ describe('BookCard', () => {
 
     expect(screen.getAllByText('The Ember Road').length).toBeGreaterThan(0)
     expect(screen.getByText('Mira Voss')).toBeInTheDocument()
+    expect(screen.getByText('en')).toBeInTheDocument()
     expect(screen.getByRole('link')).toHaveAttribute('href', '/library/hb1')
   })
 })

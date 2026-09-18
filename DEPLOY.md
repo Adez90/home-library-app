@@ -1,0 +1,119 @@
+# Deploying to your own server
+
+This assumes a Linux server you can SSH into, with a domain (or subdomain, e.g.
+`library.yourdomain.com`) already pointed at its IP address.
+
+## 1. Prerequisites on the server
+
+```bash
+# Docker + Compose plugin (Debian/Ubuntu)
+curl -fsSL https://get.docker.com | sh
+sudo apt install docker-compose-plugin
+
+# nginx + certbot, for TLS in front of the app
+sudo apt install nginx certbot python3-certbot-nginx
+```
+
+## 2. Get the code onto the server
+
+```bash
+git clone https://github.com/Adez90/home-library-app
+cd home-library-app
+```
+
+## 3. Configure secrets
+
+```bash
+cp .env.example .env
+openssl rand -hex 32   # run this twice, once for each value below
+$EDITOR .env
+```
+
+Fill in `POSTGRES_PASSWORD` and `JWT_SECRET` with the random values you generated — `docker
+compose` refuses to start without them (no insecure default in production).
+
+## 4. Build and start the app
+
+```bash
+docker compose up -d --build
+```
+
+This starts three containers: `db` (Postgres, data persisted in a Docker volume), `api`
+(the backend, which also runs pending database migrations on startup), and `web` (nginx
+serving the built frontend and proxying `/api/*` to `api`). `web` listens on `127.0.0.1:8080`
+only — it isn't reachable from the internet yet, which is what the next step is for.
+
+Check it's healthy:
+
+```bash
+docker compose ps
+curl -s http://localhost:8080/api/health   # should print {"status":"ok"}
+```
+
+## 5. Put TLS in front of it
+
+Create `/etc/nginx/sites-available/library`:
+
+```nginx
+server {
+    listen 80;
+    server_name library.yourdomain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/library /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+
+# Gets a certificate and rewrites the config above to redirect HTTP -> HTTPS automatically
+sudo certbot --nginx -d library.yourdomain.com
+```
+
+Visit `https://library.yourdomain.com` — you should see the login screen.
+
+## 6. First-time setup
+
+1. Register the first account. Leave the invite code blank — this creates your household and
+   makes you its owner.
+2. Open your account (the register/login response, or a future "household settings" screen)
+   to get the invite code.
+3. Have your wife register with that invite code — she joins your household instead of
+   creating her own, so you both see and edit the same library under separate logins.
+
+## Updating later
+
+```bash
+cd home-library-app
+git pull
+docker compose up -d --build
+```
+
+Database migrations run automatically on `api` container startup — nothing extra to do.
+
+## Backups
+
+The database lives in the `db-data` Docker volume. A simple periodic backup:
+
+```bash
+docker compose exec db pg_dump -U library library > backup-$(date +%F).sql
+```
+
+Copy that file off the server (e.g. to your own machine or object storage) regularly — a
+cron job calling a small script that runs the command above and rotates old backups is enough
+for a personal deployment like this.
+
+## Logs / troubleshooting
+
+```bash
+docker compose logs -f api      # backend logs
+docker compose logs -f web      # nginx access/error logs
+docker compose ps               # container status
+```

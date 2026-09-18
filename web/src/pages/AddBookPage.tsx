@@ -16,6 +16,7 @@ export function AddBookPage() {
   const [authorName, setAuthorName] = useState('')
   const [seriesName, setSeriesName] = useState('')
   const [volumeNumber, setVolumeNumber] = useState('')
+  const [language, setLanguage] = useState('')
   const [showSeriesFields, setShowSeriesFields] = useState(false)
   const [needsManualEntry, setNeedsManualEntry] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -86,6 +87,7 @@ export function AddBookPage() {
       if (authorName) payload.authorName = authorName.trim()
       if (seriesName) payload.seriesName = seriesName.trim()
       if (volumeNumber) payload.volumeNumber = volumeNumber.trim()
+      if (language) payload.language = language.trim()
 
       const added = await api.post<HouseholdBook>('/household-books', payload)
       navigate(`/library/${added.id}`)
@@ -166,6 +168,27 @@ export function AddBookPage() {
                 onChange={(e) => setAuthorName(e.target.value)}
                 className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
               />
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-medium">
+              Language{' '}
+              <span className="text-text-secondary font-normal">
+                (optional — set this if you own the same book in more than one language)
+              </span>
+              <input
+                list="language-options"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                placeholder="e.g. en, sv"
+                className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
+              />
+              <datalist id="language-options">
+                <option value="en">English</option>
+                <option value="sv">Swedish</option>
+                <option value="da">Danish</option>
+                <option value="no">Norwegian</option>
+                <option value="de">German</option>
+                <option value="fr">French</option>
+              </datalist>
             </label>
           </>
         )}

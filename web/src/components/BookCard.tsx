@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { HouseholdBook } from '../lib/types'
+import { LanguageBadge } from './LanguageBadge'
 
 const PLACEHOLDER_COLORS = ['#3F6B5C', '#6B5B95', '#A64B4B', '#4A6FA5', '#8C6E4A', '#557A6B', '#B08968']
 
@@ -26,7 +27,10 @@ export function BookCard({ item }: { item: HouseholdBook }) {
         )}
       </div>
       <div className="text-sm font-semibold leading-tight group-hover:text-accent">{book.title}</div>
-      {book.author && <div className="text-xs text-text-secondary">{book.author.name}</div>}
+      <div className="flex items-center gap-1.5">
+        {book.author && <span className="text-xs text-text-secondary">{book.author.name}</span>}
+        <LanguageBadge language={book.language} />
+      </div>
     </Link>
   )
 }

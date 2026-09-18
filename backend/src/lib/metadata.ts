@@ -5,11 +5,39 @@ export interface BookMetadata {
   authorName?: string;
   seriesName?: string;
   volumeNumber?: number;
+  language?: string;
   coverUrl?: string;
   source: 'open-library' | 'google-books';
 }
 
 export type FetchLike = typeof fetch;
+
+// Open Library keys editions by MARC 3-letter code (e.g. "/languages/swe"); map the
+// common ones to ISO 639-1 for a consistent, compact language field. An unmapped code
+// still gets stored as-is — better to show "swe" than to drop it.
+const MARC_TO_ISO_639_1: Record<string, string> = {
+  eng: 'en',
+  swe: 'sv',
+  fre: 'fr',
+  fra: 'fr',
+  ger: 'de',
+  deu: 'de',
+  spa: 'es',
+  ita: 'it',
+  dan: 'da',
+  nor: 'no',
+  fin: 'fi',
+  dut: 'nl',
+  nld: 'nl',
+  por: 'pt',
+  pol: 'pl',
+  rus: 'ru',
+  jpn: 'ja',
+};
+
+function marcToIso(code: string): string {
+  return MARC_TO_ISO_639_1[code] ?? code;
+}
 
 function parseSeriesEntry(entry: string): { seriesName: string; volumeNumber?: number } {
   // Open Library series entries look like "Harry Potter #1" or just "Harry Potter".
@@ -30,8 +58,12 @@ async function lookupOpenLibrary(isbn: string, fetchImpl: FetchLike): Promise<Bo
     isbn_13?: string[];
     isbn_10?: string[];
     series?: string[];
+    languages?: { key: string }[];
   };
   if (!edition.title) return null;
+
+  const languageKey = edition.languages?.[0]?.key; // "/languages/eng"
+  const language = languageKey ? marcToIso(languageKey.replace('/languages/', '')) : undefined;
 
   let authorName: string | undefined;
   const authorKey = edition.authors?.[0]?.key;
@@ -53,6 +85,7 @@ async function lookupOpenLibrary(isbn: string, fetchImpl: FetchLike): Promise<Bo
     volumeNumber: seriesInfo?.volumeNumber,
     isbn13: edition.isbn_13?.[0],
     isbn10: edition.isbn_10?.[0],
+    language,
     coverUrl: edition.covers?.[0] ? `https://covers.openlibrary.org/b/id/${edition.covers[0]}-L.jpg` : undefined,
     source: 'open-library',
   };
@@ -62,7 +95,9 @@ async function lookupGoogleBooks(isbn: string, fetchImpl: FetchLike): Promise<Bo
   const res = await fetchImpl(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
   if (!res.ok) return null;
   const data = (await res.json()) as {
-    items?: { volumeInfo?: { title?: string; authors?: string[]; imageLinks?: { thumbnail?: string } } }[];
+    items?: {
+      volumeInfo?: { title?: string; authors?: string[]; language?: string; imageLinks?: { thumbnail?: string } };
+    }[];
   };
   const info = data.items?.[0]?.volumeInfo;
   if (!info?.title) return null;
@@ -70,6 +105,7 @@ async function lookupGoogleBooks(isbn: string, fetchImpl: FetchLike): Promise<Bo
   return {
     title: info.title,
     authorName: info.authors?.[0],
+    language: info.language,
     coverUrl: info.imageLinks?.thumbnail,
     isbn13: isbn.length === 13 ? isbn : undefined,
     isbn10: isbn.length === 10 ? isbn : undefined,

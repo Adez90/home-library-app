@@ -69,6 +69,7 @@ model Book {
   authorId     String?
   seriesId     String?
   volumeNumber Int?
+  language     String? // ISO 639-1 where we can get it (e.g. "en", "sv"); free text otherwise
   coverUrl     String?
   createdAt    DateTime @default(now())
 

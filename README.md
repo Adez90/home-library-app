@@ -24,6 +24,10 @@ mobile/    React Native app (later)
 - [x] Series completion tracking
 - [x] Wishlist / favorites
 - [x] Web frontend (login, scan/add, library, series, wishlist)
+- [x] Multi-language editions (e.g. an English and a Swedish copy of the same book) tracked
+      separately, with series completion counted once per volume regardless of language
+- [x] Manual-entry deduplication (two "identical" hand-entered books reuse one catalog row)
+- [x] Separate dev/prod environments (`docker-compose.yml` vs `docker-compose.dev.yml`)
 - [ ] Multi-book shelf scan
 - [ ] Native app
 
@@ -47,17 +51,24 @@ npm run backend:test              # needs DATABASE_URL reachable
 npm run web:test
 ```
 
-### Running everything with Docker
+### Docker: dev vs. prod
+
+Two separate compose files, on purpose — dev never touches prod data, even run side by side
+on the same machine:
 
 ```bash
-docker compose up -d db
-cd backend && npx prisma migrate deploy && cd ..
-docker compose up -d api web
+# Local development — hot-reload, its own dev database on :5433, no secrets required
+docker compose -f docker-compose.dev.yml up
+
+# Production — see DEPLOY.md for the full walkthrough (domain, TLS, systemd)
+cp .env.example .env && $EDITOR .env    # set POSTGRES_PASSWORD and JWT_SECRET
+docker compose up -d --build
 ```
 
 The `web` service serves the built frontend via nginx on `:8080` and proxies `/api/*` to the
 `api` service. Put your own TLS-terminating reverse proxy (nginx + Let's Encrypt on your domain)
-in front of port 8080 for production.
+in front of port 8080 for production — see **[DEPLOY.md](./DEPLOY.md)** for step-by-step
+instructions on your own server.
 
 ## Accounts
 
@@ -66,10 +77,24 @@ second person to the *same* household (e.g. sharing with your partner), have the
 the `inviteCode` from `GET /auth/me` (or the register/login response) — they join as a `member`
 of the same household instead of creating their own.
 
+## Multiple languages
+
+Owning the same title in more than one language (e.g. Sarah J. Maas in both English and
+Swedish) is fully supported — each language edition is its own catalog row (own ISBN, own
+cover), shown with a small language badge. A series' "X of Y owned" count is per **volume**,
+not per edition: owning Book 1 in both English and Swedish still counts as one volume owned.
+The series page's language filter lets you drill into "how much of this series do I have in
+Swedish specifically."
+
+Dragon Ball vs. Dragon Ball Z, or any other same-franchise-different-series situation, needs no
+special handling — they're just two different series names, kept apart automatically.
+
 ## Known limitations
 
-- Manually-added books (no ISBN) aren't deduplicated across households by title — two households
-  entering "the same" book by hand get two catalog rows. ISBN-based adds don't have this problem.
+- Manual-entry dedup (title + author + series + volume + language, exact match) prevents the
+  obvious duplicate case, but isn't fuzzy — "The Ember Road" and "the ember road " (trailing
+  space) won't be caught by a typo-level mismatch. ISBN-based adds don't have this problem at
+  all, since the ISBN itself is the dedup key.
 - Series pages only know about volumes someone has looked up or added; there's no external
   "this series has 7 books" source yet (planned: Wikidata).
 - Open Library / Google Books lookups are unit-tested against fixtures, not live network calls,

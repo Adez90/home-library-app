@@ -35,6 +35,7 @@ export interface HouseholdBook {
     isbn10: string | null
     coverUrl: string | null
     volumeNumber: number | null
+    language: string | null
     author: AuthorRef | null
     series: SeriesRef | null
   }
@@ -46,6 +47,7 @@ export interface SeriesVolume {
   id: string
   title: string
   volumeNumber: number | null
+  language: string | null
   isbn13: string | null
   coverUrl: string | null
   author: AuthorRef | null
@@ -58,6 +60,7 @@ export interface SeriesDetail {
   volumes: SeriesVolume[]
   ownedCount: number
   totalCount: number
+  languages: string[]
 }
 
 export interface Favorite {

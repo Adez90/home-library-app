@@ -92,6 +92,68 @@ describe('series completion', () => {
     expect(list.json()).toHaveLength(1);
   });
 
+  it('counts a volume owned in any language as one completed slot, and lists distinct languages', async () => {
+    const { cookie } = await registerUser(app, 'multilingual@example.com');
+
+    vi.mocked(lookupByIsbn).mockResolvedValueOnce({
+      title: 'Throne of Glass',
+      authorName: 'Sarah J. Maas',
+      seriesName: 'Throne of Glass',
+      volumeNumber: 1,
+      language: 'en',
+      isbn13: '9780000000301',
+      source: 'open-library',
+    });
+    const english = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { isbn: '9780000000301' },
+    });
+    const seriesId = english.json().book.series.id;
+
+    vi.mocked(lookupByIsbn).mockResolvedValueOnce({
+      title: 'Glasslott',
+      authorName: 'Sarah J. Maas',
+      seriesName: 'Throne of Glass',
+      volumeNumber: 1,
+      language: 'sv',
+      isbn13: '9780000000302',
+      source: 'open-library',
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { isbn: '9780000000302' },
+    });
+
+    vi.mocked(lookupByIsbn).mockResolvedValueOnce({
+      title: 'Crown of Midnight',
+      authorName: 'Sarah J. Maas',
+      seriesName: 'Throne of Glass',
+      volumeNumber: 2,
+      language: 'en',
+      isbn13: '9780000000303',
+      source: 'open-library',
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { isbn: '9780000000303', status: 'hunting' },
+    });
+
+    const detail = await app.inject({ method: 'GET', url: `/series/${seriesId}`, cookies: { session: cookie } });
+    const body = detail.json();
+
+    // Volume 1 owned in two languages is still ONE completed slot; volume 2 (hunting only) is not owned.
+    expect(body.ownedCount).toBe(1);
+    expect(body.totalCount).toBe(2);
+    expect(body.languages).toEqual(['en', 'sv']);
+    expect(body.volumes).toHaveLength(3);
+  });
+
   it('404s for a series id that does not exist', async () => {
     const { cookie } = await registerUser(app, 'noseries@example.com');
     const res = await app.inject({

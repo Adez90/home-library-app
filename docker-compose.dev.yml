@@ -1,0 +1,55 @@
+# Local development stack — separate from docker-compose.yml (production) on purpose:
+# its own database, its own ports, hardcoded non-secret dev credentials (never used in
+# prod), and hot-reloading source mounts instead of built images. Safe to run alongside
+# the prod stack on the same machine without touching prod data.
+#
+# Usage: docker compose -f docker-compose.dev.yml up
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: library_dev
+      POSTGRES_PASSWORD: library_dev
+      POSTGRES_DB: library_dev
+    volumes:
+      - db-data-dev:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U library_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: node:22-alpine
+    working_dir: /app/backend
+    volumes:
+      - .:/app
+    command: sh -c "npm install && npx prisma migrate deploy && npm run dev"
+    environment:
+      DATABASE_URL: postgresql://library_dev:library_dev@db:5432/library_dev
+      JWT_SECRET: dev-secret-not-for-production
+      NODE_ENV: development
+      PORT: 3000
+    ports:
+      - "3001:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: node:22-alpine
+    working_dir: /app/web
+    volumes:
+      - .:/app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    environment:
+      VITE_API_PROXY_TARGET: http://api:3000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+volumes:
+  db-data-dev:

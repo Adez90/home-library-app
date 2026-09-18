@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../lib/api'
 import type { BookStatus, HouseholdBook } from '../lib/types'
 import { ChevronLeftIcon, HeartIcon } from '../components/icons'
+import { LanguageBadge } from '../components/LanguageBadge'
 
 const STATUS_OPTIONS: { value: BookStatus; label: string }[] = [
   { value: 'owned', label: 'Owned' },
@@ -91,7 +92,10 @@ export function BookDetailPage() {
       </div>
 
       <div className="text-center">
-        <h1 className="font-heading text-xl font-bold">{book.title}</h1>
+        <div className="flex items-center justify-center gap-2">
+          <h1 className="font-heading text-xl font-bold">{book.title}</h1>
+          <LanguageBadge language={book.language} />
+        </div>
         {book.author && (
           <div className="flex items-center justify-center gap-2 text-sm text-text-secondary mt-1">
             {book.author.name}
