@@ -1,0 +1,26 @@
+# Override for deploying alongside another Docker Compose stack that already runs a shared
+# reverse proxy (e.g. Caddy or nginx-proxy) on its own Docker network — attaches `web` to that
+# network under a distinct alias so the existing proxy can reach it directly by container DNS,
+# instead of needing its own host-published port or its own certbot/nginx install. The main
+# docker-compose.yml is untouched by this, so a normal dedicated-server deployment (see
+# DEPLOY.md) is unaffected whether or not this file exists.
+#
+# Usage:
+#   1. Find the other stack's network name: `docker network ls` (typically
+#      `<that project's directory name>_default`).
+#   2. Set SHARED_PROXY_NETWORK to it in .env.
+#   3. docker compose -f docker-compose.yml -f docker-compose.shared-proxy.yml up -d --build
+#   4. Point the existing reverse proxy at this container by the alias below (`homelib-web`,
+#      port 80) instead of by IP or host port.
+services:
+  web:
+    networks:
+      default: {}
+      shared-proxy:
+        aliases:
+          - homelib-web
+
+networks:
+  shared-proxy:
+    name: ${SHARED_PROXY_NETWORK:?Set SHARED_PROXY_NETWORK in .env to the other stack's network name}
+    external: true
