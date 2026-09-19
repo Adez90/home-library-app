@@ -117,4 +117,58 @@ describe('auth', () => {
     expect(me.statusCode).toBe(200);
     expect(me.json().user.email).toBe('me@example.com');
   });
+
+  describe('REGISTRATION_SECRET gate', () => {
+    afterEach(() => {
+      delete process.env.REGISTRATION_SECRET;
+    });
+
+    it('rejects a new household without the secret when one is configured', async () => {
+      process.env.REGISTRATION_SECRET = 'letmein';
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/auth/register',
+        payload: { email: 'stranger@example.com', password: 'password123', name: 'Stranger' },
+      });
+
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('accepts a new household when the secret matches', async () => {
+      process.env.REGISTRATION_SECRET = 'letmein';
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/auth/register',
+        payload: {
+          email: 'owner2@example.com',
+          password: 'password123',
+          name: 'Owner',
+          registrationSecret: 'letmein',
+        },
+      });
+
+      expect(res.statusCode).toBe(201);
+    });
+
+    it('still lets someone join an existing household by invite code without the secret', async () => {
+      const owner = await app.inject({
+        method: 'POST',
+        url: '/auth/register',
+        payload: { email: 'owner3@example.com', password: 'password123', name: 'Owner' },
+      });
+      const inviteCode = owner.json().household.inviteCode;
+
+      process.env.REGISTRATION_SECRET = 'letmein';
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/auth/register',
+        payload: { email: 'joiner@example.com', password: 'password123', name: 'Joiner', inviteCode },
+      });
+
+      expect(res.statusCode).toBe(201);
+    });
+  });
 });

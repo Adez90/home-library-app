@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LoginPage } from './LoginPage'
 import { AuthProvider } from '../lib/auth'
+import { I18nProvider } from '../lib/i18n'
 
 function mockFetchSequence(responses: { status: number; body?: unknown }[]) {
   let call = 0
@@ -29,11 +30,13 @@ describe('LoginPage', () => {
     ])
 
     render(
-      <MemoryRouter>
-        <AuthProvider>
-          <LoginPage />
-        </AuthProvider>
-      </MemoryRouter>,
+      <I18nProvider>
+        <MemoryRouter>
+          <AuthProvider>
+            <LoginPage />
+          </AuthProvider>
+        </MemoryRouter>
+      </I18nProvider>,
     )
 
     await userEvent.type(screen.getByLabelText('Email'), 'a@example.com')

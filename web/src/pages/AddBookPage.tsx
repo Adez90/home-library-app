@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../lib/api'
 import type { HouseholdBook } from '../lib/types'
 import { ScanIcon } from '../components/icons'
+import { useTranslation } from '../lib/i18n'
 
 // Not every browser exposes this yet — feature-detected, never assumed.
 type BarcodeDetectorCtor = new (options: { formats: string[] }) => {
@@ -11,6 +12,7 @@ type BarcodeDetectorCtor = new (options: { formats: string[] }) => {
 
 export function AddBookPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [isbn, setIsbn] = useState('')
   const [title, setTitle] = useState('')
   const [authorName, setAuthorName] = useState('')
@@ -65,7 +67,7 @@ export function AddBookPage() {
       }
       requestAnimationFrame(tick)
     } catch {
-      setScanError('Could not access the camera. You can still enter the ISBN below.')
+      setScanError(t('addBook.cameraError'))
       setScanning(false)
     }
   }
@@ -94,11 +96,11 @@ export function AddBookPage() {
     } catch (err) {
       if (err instanceof ApiError && err.status === 404 && isbn && !title) {
         setNeedsManualEntry(true)
-        setError('No match found for that ISBN — enter the title below and we will save it manually.')
+        setError(t('addBook.notFound'))
       } else if (err instanceof ApiError && err.status === 409) {
-        setError('This book is already in your library.')
+        setError(t('addBook.alreadyInLibrary'))
       } else {
-        setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.')
+        setError(err instanceof ApiError ? err.message : t('common.somethingWentWrong'))
       }
     } finally {
       setSubmitting(false)
@@ -107,7 +109,7 @@ export function AddBookPage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-md">
-      <h1 className="font-heading text-2xl font-bold">Add a book</h1>
+      <h1 className="font-heading text-2xl font-bold">{t('addBook.title')}</h1>
 
       <div className="rounded-xl border border-border bg-surface p-4 flex flex-col gap-3">
         {scanning ? (
@@ -118,7 +120,7 @@ export function AddBookPage() {
               onClick={stopScan}
               className="rounded-lg border border-border text-sm font-semibold py-2"
             >
-              Cancel scan
+              {t('addBook.cancelScan')}
             </button>
           </div>
         ) : (
@@ -129,24 +131,20 @@ export function AddBookPage() {
             className="flex items-center justify-center gap-2 rounded-lg bg-text text-white text-sm font-semibold py-3 disabled:opacity-40"
           >
             <ScanIcon width={18} height={18} />
-            Scan barcode
+            {t('addBook.scanBarcode')}
           </button>
         )}
-        {!scanSupported && (
-          <p className="text-xs text-text-secondary">
-            Camera barcode scanning isn't supported in this browser yet — enter the ISBN below instead.
-          </p>
-        )}
+        {!scanSupported && <p className="text-xs text-text-secondary">{t('addBook.scanUnsupported')}</p>}
         {scanError && <p className="text-xs text-danger">{scanError}</p>}
       </div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-sm font-medium">
-          ISBN
+          {t('addBook.isbn')}
           <input
             value={isbn}
             onChange={(e) => setIsbn(e.target.value)}
-            placeholder="e.g. 9780747532699"
+            placeholder={t('addBook.isbnPlaceholder')}
             className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
           />
         </label>
@@ -154,7 +152,8 @@ export function AddBookPage() {
         {(needsManualEntry || !isbn) && (
           <>
             <label className="flex flex-col gap-1 text-sm font-medium">
-              Title {!isbn && <span className="text-text-secondary font-normal">(if you don't have the ISBN)</span>}
+              {t('addBook.titleLabel')}{' '}
+              {!isbn && <span className="text-text-secondary font-normal">{t('addBook.titleHint')}</span>}
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -162,7 +161,7 @@ export function AddBookPage() {
               />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium">
-              Author <span className="text-text-secondary font-normal">(optional)</span>
+              {t('addBook.author')} <span className="text-text-secondary font-normal">{t('common.optional')}</span>
               <input
                 value={authorName}
                 onChange={(e) => setAuthorName(e.target.value)}
@@ -170,24 +169,17 @@ export function AddBookPage() {
               />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium">
-              Language{' '}
-              <span className="text-text-secondary font-normal">
-                (optional — set this if you own the same book in more than one language)
-              </span>
+              {t('addBook.language')} <span className="text-text-secondary font-normal">{t('addBook.languageHint')}</span>
               <input
                 list="language-options"
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                placeholder="e.g. en, sv"
+                placeholder={t('addBook.languagePlaceholder')}
                 className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
               />
               <datalist id="language-options">
-                <option value="en">English</option>
-                <option value="sv">Swedish</option>
-                <option value="da">Danish</option>
-                <option value="no">Norwegian</option>
-                <option value="de">German</option>
-                <option value="fr">French</option>
+                <option value="en">{t('addBook.languageEnglish')}</option>
+                <option value="sv">{t('addBook.languageSwedish')}</option>
               </datalist>
             </label>
           </>
@@ -196,16 +188,16 @@ export function AddBookPage() {
         {showSeriesFields ? (
           <div className="flex gap-3">
             <label className="flex flex-col gap-1 text-sm font-medium flex-1">
-              Series <span className="text-text-secondary font-normal">(optional)</span>
+              {t('addBook.series')} <span className="text-text-secondary font-normal">{t('common.optional')}</span>
               <input
                 value={seriesName}
                 onChange={(e) => setSeriesName(e.target.value)}
-                placeholder="e.g. The Lantern Cycle"
+                placeholder={t('addBook.seriesPlaceholder')}
                 className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
               />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium w-20">
-              Book #
+              {t('addBook.bookNumber')}
               <input
                 type="number"
                 min={1}
@@ -221,7 +213,7 @@ export function AddBookPage() {
             onClick={() => setShowSeriesFields(true)}
             className="text-sm text-accent font-medium self-start"
           >
-            + Add series info
+            {t('addBook.addSeriesInfo')}
           </button>
         )}
 
@@ -232,7 +224,7 @@ export function AddBookPage() {
           disabled={submitting || (!isbn && !title)}
           className="rounded-lg bg-accent text-white font-semibold py-2.5 text-sm disabled:opacity-50"
         >
-          {submitting ? 'Adding…' : 'Add to library'}
+          {submitting ? t('addBook.submitting') : t('addBook.submit')}
         </button>
       </form>
     </div>

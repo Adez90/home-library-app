@@ -7,7 +7,14 @@ interface AuthState {
   households: Household[]
   loading: boolean
   login: (email: string, password: string) => Promise<void>
-  register: (input: { email: string; password: string; name: string; householdName?: string; inviteCode?: string }) => Promise<void>
+  register: (input: {
+    email: string
+    password: string
+    name: string
+    householdName?: string
+    inviteCode?: string
+    registrationSecret?: string
+  }) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -46,7 +53,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const register = useCallback(
-    async (input: { email: string; password: string; name: string; householdName?: string; inviteCode?: string }) => {
+    async (input: {
+      email: string
+      password: string
+      name: string
+      householdName?: string
+      inviteCode?: string
+      registrationSecret?: string
+    }) => {
       const result = await api.post<{ user: User; household: Household }>('/auth/register', input)
       setUser(result.user)
       setHouseholds([result.household])

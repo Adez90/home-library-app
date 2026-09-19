@@ -4,15 +4,18 @@ import { api } from '../lib/api'
 import type { BookStatus, HouseholdBook } from '../lib/types'
 import { BookCard } from '../components/BookCard'
 import { SearchIcon, PlusIcon } from '../components/icons'
+import { useTranslation } from '../lib/i18n'
+import type { TranslationKey } from '../lib/i18n/translations'
 
-const FILTERS: { value: BookStatus | 'all'; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'owned', label: 'Owned' },
-  { value: 'wishlist', label: 'Wishlist' },
-  { value: 'hunting', label: 'Hunting' },
+const FILTERS: { value: BookStatus | 'all'; labelKey: TranslationKey }[] = [
+  { value: 'all', labelKey: 'library.filterAll' },
+  { value: 'owned', labelKey: 'library.filterOwned' },
+  { value: 'wishlist', labelKey: 'library.filterWishlist' },
+  { value: 'hunting', labelKey: 'library.filterHunting' },
 ]
 
 export function LibraryPage() {
+  const { t } = useTranslation()
   const [books, setBooks] = useState<HouseholdBook[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -34,13 +37,13 @@ export function LibraryPage() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-2xl font-bold">Your library</h1>
+        <h1 className="font-heading text-2xl font-bold">{t('library.title')}</h1>
         <Link
           to="/add"
           className="hidden md:inline-flex items-center gap-2 rounded-lg bg-accent text-white text-sm font-semibold px-4 py-2"
         >
           <PlusIcon width={16} height={16} />
-          Add book
+          {t('library.addBook')}
         </Link>
       </div>
 
@@ -49,7 +52,7 @@ export function LibraryPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search your books…"
+          placeholder={t('library.search')}
           className="w-full text-sm outline-none bg-transparent"
         />
       </div>
@@ -63,18 +66,18 @@ export function LibraryPage() {
               filter === f.value ? 'bg-text text-white' : 'bg-surface border border-border text-text-secondary'
             }`}
           >
-            {f.label}
+            {t(f.labelKey)}
           </button>
         ))}
       </div>
 
       {loading ? (
-        <p className="text-sm text-text-secondary">Loading…</p>
+        <p className="text-sm text-text-secondary">{t('common.loading')}</p>
       ) : books.length === 0 ? (
         <p className="text-sm text-text-secondary">
-          Nothing here yet.{' '}
+          {t('library.empty')}{' '}
           <Link to="/add" className="text-accent font-medium">
-            Add your first book
+            {t('library.addFirstBook')}
           </Link>
           .
         </p>
@@ -89,7 +92,7 @@ export function LibraryPage() {
       <Link
         to="/add"
         className="md:hidden fixed bottom-24 right-5 w-14 h-14 rounded-full bg-accent text-white flex items-center justify-center shadow-lg"
-        aria-label="Add book"
+        aria-label={t('library.addBook')}
       >
         <PlusIcon width={24} height={24} />
       </Link>

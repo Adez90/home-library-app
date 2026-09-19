@@ -1,13 +1,16 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import type { ComponentType, SVGProps } from 'react'
 import { LibraryIcon, ScanIcon, SeriesIcon, HeartIcon } from './icons'
+import { LanguageSwitcher } from './LanguageSwitcher'
 import { useAuth } from '../lib/auth'
+import { useTranslation } from '../lib/i18n'
+import type { TranslationKey } from '../lib/i18n/translations'
 
-const NAV_ITEMS: { to: string; label: string; icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
-  { to: '/library', label: 'Library', icon: LibraryIcon },
-  { to: '/add', label: 'Scan', icon: ScanIcon },
-  { to: '/series', label: 'Series', icon: SeriesIcon },
-  { to: '/wishlist', label: 'Wishlist', icon: HeartIcon },
+const NAV_ITEMS: { to: string; labelKey: TranslationKey; icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
+  { to: '/library', labelKey: 'nav.library', icon: LibraryIcon },
+  { to: '/add', labelKey: 'nav.scan', icon: ScanIcon },
+  { to: '/series', labelKey: 'nav.series', icon: SeriesIcon },
+  { to: '/wishlist', labelKey: 'nav.wishlist', icon: HeartIcon },
 ]
 
 function navLinkClasses(isActive: boolean) {
@@ -16,18 +19,19 @@ function navLinkClasses(isActive: boolean) {
 
 export function AppShell() {
   const { logout, households } = useAuth()
+  const { t } = useTranslation()
   const household = households[0]
 
   return (
     <div className="min-h-svh flex flex-col">
       <header className="border-b border-border bg-surface">
-        <div className="mx-auto max-w-5xl flex items-center justify-between px-4 py-3 md:px-6">
+        <div className="mx-auto max-w-5xl flex items-center justify-between px-4 py-3 md:px-6 gap-3">
           <span className="font-heading text-lg font-semibold">
-            {household ? household.name : 'Home Library'}
+            {household ? household.name : t('nav.defaultHouseholdName')}
           </span>
 
           <nav className="hidden md:flex items-center gap-6">
-            {NAV_ITEMS.map(({ to, label, icon: ItemIcon }) => (
+            {NAV_ITEMS.map(({ to, labelKey, icon: ItemIcon }) => (
               <NavLink
                 key={to}
                 to={to}
@@ -36,18 +40,21 @@ export function AppShell() {
                 }
               >
                 <ItemIcon width={18} height={18} />
-                {label}
+                {t(labelKey)}
               </NavLink>
             ))}
           </nav>
 
-          <button
-            type="button"
-            onClick={() => logout()}
-            className="text-sm font-medium text-text-secondary hover:text-text"
-          >
-            Log out
-          </button>
+          <div className="flex items-center gap-3">
+            <LanguageSwitcher />
+            <button
+              type="button"
+              onClick={() => logout()}
+              className="text-sm font-medium text-text-secondary hover:text-text"
+            >
+              {t('nav.logout')}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -56,7 +63,7 @@ export function AppShell() {
       </main>
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-border flex items-center justify-around py-2">
-        {NAV_ITEMS.map(({ to, label, icon: ItemIcon }) => (
+        {NAV_ITEMS.map(({ to, labelKey, icon: ItemIcon }) => (
           <NavLink
             key={to}
             to={to}
@@ -69,7 +76,7 @@ export function AppShell() {
                 <span className={`flex items-center justify-center w-9 h-7 rounded-lg ${isActive ? 'bg-accent-soft' : ''}`}>
                   <ItemIcon width={18} height={18} />
                 </span>
-                {label}
+                {t(labelKey)}
               </>
             )}
           </NavLink>

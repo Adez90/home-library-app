@@ -2,9 +2,12 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { ApiError } from '../lib/api'
+import { useTranslation } from '../lib/i18n'
+import { LanguageSwitcher } from '../components/LanguageSwitcher'
 
 export function RegisterPage() {
   const { register } = useAuth()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -12,6 +15,7 @@ export function RegisterPage() {
   const [hasInvite, setHasInvite] = useState(false)
   const [inviteCode, setInviteCode] = useState('')
   const [householdName, setHouseholdName] = useState('')
+  const [registrationSecret, setRegistrationSecret] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -26,26 +30,28 @@ export function RegisterPage() {
         password,
         inviteCode: hasInvite ? inviteCode.trim() : undefined,
         householdName: !hasInvite && householdName ? householdName : undefined,
+        registrationSecret: !hasInvite && registrationSecret ? registrationSecret.trim() : undefined,
       })
       navigate('/library')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.')
+      setError(err instanceof ApiError ? err.message : t('common.somethingWentWrong'))
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <div className="min-h-svh flex items-center justify-center px-4 py-10">
+    <div className="min-h-svh flex items-center justify-center px-4 py-10 relative">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
       <div className="w-full max-w-sm bg-surface border border-border rounded-2xl p-8">
-        <h1 className="font-heading text-2xl font-bold mb-1">Create your account</h1>
-        <p className="text-sm text-text-secondary mb-6">
-          Have an invite code from your household? Use it to join their library instead of starting a new one.
-        </p>
+        <h1 className="font-heading text-2xl font-bold mb-1">{t('register.title')}</h1>
+        <p className="text-sm text-text-secondary mb-6">{t('register.subtitle')}</p>
 
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Your name
+            {t('register.name')}
             <input
               required
               value={name}
@@ -54,7 +60,7 @@ export function RegisterPage() {
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Email
+            {t('register.email')}
             <input
               type="email"
               required
@@ -64,7 +70,7 @@ export function RegisterPage() {
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Password
+            {t('register.password')}
             <input
               type="password"
               required
@@ -77,12 +83,12 @@ export function RegisterPage() {
 
           <label className="flex items-center gap-2 text-sm font-medium">
             <input type="checkbox" checked={hasInvite} onChange={(e) => setHasInvite(e.target.checked)} />
-            I have an invite code
+            {t('register.hasInvite')}
           </label>
 
           {hasInvite ? (
             <label className="flex flex-col gap-1 text-sm font-medium">
-              Invite code
+              {t('register.inviteCode')}
               <input
                 required
                 value={inviteCode}
@@ -92,15 +98,27 @@ export function RegisterPage() {
               />
             </label>
           ) : (
-            <label className="flex flex-col gap-1 text-sm font-medium">
-              Household name <span className="text-text-secondary font-normal">(optional)</span>
-              <input
-                value={householdName}
-                onChange={(e) => setHouseholdName(e.target.value)}
-                placeholder={name ? `${name}'s library` : 'e.g. Our library'}
-                className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
-              />
-            </label>
+            <>
+              <label className="flex flex-col gap-1 text-sm font-medium">
+                {t('register.householdName')}{' '}
+                <span className="text-text-secondary font-normal">{t('common.optional')}</span>
+                <input
+                  value={householdName}
+                  onChange={(e) => setHouseholdName(e.target.value)}
+                  placeholder={t('register.householdNamePlaceholder')}
+                  className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm font-medium">
+                {t('register.registrationCode')}{' '}
+                <span className="text-text-secondary font-normal">{t('register.registrationCodeHint')}</span>
+                <input
+                  value={registrationSecret}
+                  onChange={(e) => setRegistrationSecret(e.target.value)}
+                  className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
+                />
+              </label>
+            </>
           )}
 
           {error && <p className="text-sm text-danger">{error}</p>}
@@ -110,14 +128,14 @@ export function RegisterPage() {
             disabled={submitting}
             className="rounded-lg bg-text text-white font-semibold py-2.5 text-sm disabled:opacity-60"
           >
-            {submitting ? 'Creating account…' : 'Create account'}
+            {submitting ? t('register.submitting') : t('register.submit')}
           </button>
         </form>
 
         <p className="mt-6 text-sm text-text-secondary text-center">
-          Already have an account?{' '}
+          {t('register.alreadyHaveAccount')}{' '}
           <Link to="/login" className="text-accent font-medium">
-            Log in
+            {t('register.logIn')}
           </Link>
         </p>
       </div>

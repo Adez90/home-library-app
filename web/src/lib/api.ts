@@ -14,7 +14,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...options,
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
+      // Only set when there's an actual body — Fastify's default JSON parser rejects a
+      // request that declares application/json but sends no body (e.g. logout, delete).
+      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       ...options.headers,
     },
   })

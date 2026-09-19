@@ -11,6 +11,7 @@ const registerSchema = z.object({
   name: z.string().min(1),
   householdName: z.string().min(1).optional(),
   inviteCode: z.string().min(4).optional(),
+  registrationSecret: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -51,12 +52,20 @@ async function loadHouseholdsForUser(userId: string) {
 class InviteCodeNotFound extends Error {}
 
 export async function registerAuthRoutes(app: FastifyInstance) {
-  app.post('/register', async (request, reply) => {
+  app.post('/register', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
     const parsed = registerSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Invalid input', details: parsed.error.flatten() });
     }
-    const { email, password, name, householdName, inviteCode } = parsed.data;
+    const { email, password, name, householdName, inviteCode, registrationSecret } = parsed.data;
+
+    // Anyone can join an existing household with its own invite code (that's the point of
+    // invite codes). Starting a brand-new household is the thing worth gating on a server
+    // exposed to the internet — REGISTRATION_SECRET, when set, is required for that path.
+    const requiredSecret = process.env.REGISTRATION_SECRET;
+    if (!inviteCode && requiredSecret && registrationSecret !== requiredSecret) {
+      return reply.code(403).send({ error: 'Registration is invite-only on this server' });
+    }
 
     const passwordHash = await hashPassword(password);
 
@@ -110,7 +119,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/login', async (request, reply) => {
+  app.post('/login', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     const parsed = loginSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Invalid input', details: parsed.error.flatten() });

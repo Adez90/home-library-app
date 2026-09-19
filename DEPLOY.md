@@ -25,12 +25,15 @@ cd home-library-app
 
 ```bash
 cp .env.example .env
-openssl rand -hex 32   # run this twice, once for each value below
+openssl rand -hex 32   # run this three times, once for each value below
 $EDITOR .env
 ```
 
-Fill in `POSTGRES_PASSWORD` and `JWT_SECRET` with the random values you generated — `docker
-compose` refuses to start without them (no insecure default in production).
+Fill in `POSTGRES_PASSWORD` and `JWT_SECRET` with random values you generated — `docker compose`
+refuses to start without them (no insecure default in production). Also set
+`REGISTRATION_SECRET` — without it, anyone who finds your domain can register and create their
+own household on your server. Once it's set, only someone who knows that value can start a *new*
+household; your wife joining *yours* still only needs the invite code from step 6, never this.
 
 ## 4. Build and start the app
 
@@ -82,11 +85,16 @@ Visit `https://library.yourdomain.com` — you should see the login screen.
 ## 6. First-time setup
 
 1. Register the first account. Leave the invite code blank — this creates your household and
-   makes you its owner.
+   makes you its owner. If you set `REGISTRATION_SECRET` in step 3, enter it in the
+   "Registration code" field (only shown when you're not using an invite code).
 2. Open your account (the register/login response, or a future "household settings" screen)
    to get the invite code.
 3. Have your wife register with that invite code — she joins your household instead of
-   creating her own, so you both see and edit the same library under separate logins.
+   creating her own, so you both see and edit the same library under separate logins. She does
+   *not* need the registration code from step 1 for this.
+
+The app is in English by default; either of you can switch to Swedish with the EN/SV switcher
+in the header (or on the login/register screen) — the choice is remembered per browser.
 
 ## Updating later
 

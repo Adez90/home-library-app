@@ -4,16 +4,19 @@ import { api, ApiError } from '../lib/api'
 import type { BookStatus, HouseholdBook } from '../lib/types'
 import { ChevronLeftIcon, HeartIcon } from '../components/icons'
 import { LanguageBadge } from '../components/LanguageBadge'
+import { useTranslation } from '../lib/i18n'
+import type { TranslationKey } from '../lib/i18n/translations'
 
-const STATUS_OPTIONS: { value: BookStatus; label: string }[] = [
-  { value: 'owned', label: 'Owned' },
-  { value: 'wishlist', label: 'Wishlist' },
-  { value: 'hunting', label: 'Hunting' },
+const STATUS_OPTIONS: { value: BookStatus; labelKey: TranslationKey }[] = [
+  { value: 'owned', labelKey: 'bookDetail.statusOwned' },
+  { value: 'wishlist', labelKey: 'bookDetail.statusWishlist' },
+  { value: 'hunting', labelKey: 'bookDetail.statusHunting' },
 ]
 
 export function BookDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [item, setItem] = useState<HouseholdBook | null>(null)
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
@@ -66,12 +69,12 @@ export function BookDetailPage() {
 
   async function removeBook() {
     if (!item) return
-    if (!window.confirm('Remove this book from your library?')) return
+    if (!window.confirm(t('bookDetail.removeConfirm'))) return
     await api.delete(`/household-books/${item.id}`)
     navigate('/library')
   }
 
-  if (!item) return <p className="text-sm text-text-secondary">Loading…</p>
+  if (!item) return <p className="text-sm text-text-secondary">{t('common.loading')}</p>
 
   const { book } = item
 
@@ -79,7 +82,7 @@ export function BookDetailPage() {
     <div className="max-w-md flex flex-col gap-5">
       <Link to="/library" className="inline-flex items-center gap-1 text-sm text-text-secondary">
         <ChevronLeftIcon width={16} height={16} />
-        Back to library
+        {t('bookDetail.backToLibrary')}
       </Link>
 
       <div className="flex justify-center">
@@ -99,7 +102,12 @@ export function BookDetailPage() {
         {book.author && (
           <div className="flex items-center justify-center gap-2 text-sm text-text-secondary mt-1">
             {book.author.name}
-            <button type="button" onClick={favoriteAuthor} disabled={favoriting || favorited} aria-label="Favorite author">
+            <button
+              type="button"
+              onClick={favoriteAuthor}
+              disabled={favoriting || favorited}
+              aria-label={t('wishlist.favoriteAuthor')}
+            >
               <HeartIcon width={14} height={14} filled={favorited} className={favorited ? 'text-accent' : ''} />
             </button>
           </div>
@@ -110,7 +118,7 @@ export function BookDetailPage() {
             className="inline-block mt-2 rounded-full border border-border px-3 py-1 text-xs font-semibold"
           >
             {book.series.name}
-            {book.volumeNumber != null ? ` · Book ${book.volumeNumber}` : ''}
+            {book.volumeNumber != null ? ` · ${t('common.bookNumber', { n: book.volumeNumber })}` : ''}
           </Link>
         )}
       </div>
@@ -125,14 +133,14 @@ export function BookDetailPage() {
               item.status === opt.value ? 'bg-text text-white' : 'bg-surface border border-border text-text-secondary'
             }`}
           >
-            {opt.label}
+            {t(opt.labelKey)}
           </button>
         ))}
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-4">
         <label htmlFor="condition-note" className="text-xs font-bold uppercase tracking-wide text-text-secondary">
-          Condition &amp; notes
+          {t('bookDetail.conditionNotes')}
         </label>
         <textarea
           id="condition-note"
@@ -141,14 +149,16 @@ export function BookDetailPage() {
           onBlur={saveNote}
           rows={3}
           className="mt-2 w-full text-sm outline-none resize-none"
-          placeholder="Add a note…"
+          placeholder={t('bookDetail.addNote')}
         />
       </div>
 
-      {book.isbn13 && <p className="text-xs text-text-secondary text-center">ISBN {book.isbn13}</p>}
+      {book.isbn13 && (
+        <p className="text-xs text-text-secondary text-center">{t('bookDetail.isbn', { isbn: book.isbn13 })}</p>
+      )}
 
       <button type="button" onClick={removeBook} className="text-sm text-danger font-medium self-center">
-        Remove from library
+        {t('bookDetail.remove')}
       </button>
     </div>
   )

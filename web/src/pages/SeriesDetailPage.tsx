@@ -5,9 +5,11 @@ import type { SeriesDetail } from '../lib/types'
 import { StatusBadge } from '../components/StatusBadge'
 import { LanguageBadge } from '../components/LanguageBadge'
 import { ChevronLeftIcon, HeartIcon } from '../components/icons'
+import { useTranslation } from '../lib/i18n'
 
 export function SeriesDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const { t } = useTranslation()
   const [series, setSeries] = useState<SeriesDetail | null>(null)
   const [favoriting, setFavoriting] = useState(false)
   const [favorited, setFavorited] = useState(false)
@@ -32,7 +34,7 @@ export function SeriesDetailPage() {
     }
   }
 
-  if (!series) return <p className="text-sm text-text-secondary">Loading…</p>
+  if (!series) return <p className="text-sm text-text-secondary">{t('common.loading')}</p>
 
   const visibleVolumes =
     languageFilter === 'all' ? series.volumes : series.volumes.filter((v) => v.language === languageFilter)
@@ -46,21 +48,24 @@ export function SeriesDetailPage() {
     <div className="max-w-md flex flex-col gap-5">
       <Link to="/series" className="inline-flex items-center gap-1 text-sm text-text-secondary">
         <ChevronLeftIcon width={16} height={16} />
-        All series
+        {t('series.allSeries')}
       </Link>
 
       <div className="flex items-center gap-2">
         <h1 className="font-heading text-2xl font-bold">{series.name}</h1>
-        <button type="button" onClick={favoriteSeries} disabled={favoriting || favorited} aria-label="Favorite series">
+        <button
+          type="button"
+          onClick={favoriteSeries}
+          disabled={favoriting || favorited}
+          aria-label={t('wishlist.favoriteSeries')}
+        >
           <HeartIcon width={18} height={18} filled={favorited} className={favorited ? 'text-accent' : 'text-text-secondary'} />
         </button>
       </div>
 
       <div>
         <div className="flex items-center justify-between text-sm mb-1">
-          <span className="font-semibold">
-            {ownedCount} of {totalCount} owned
-          </span>
+          <span className="font-semibold">{t('series.owned', { owned: ownedCount, total: totalCount })}</span>
           <span className="text-text-secondary">{pct}%</span>
         </div>
         <div className="h-2 rounded-full bg-border overflow-hidden">
@@ -76,7 +81,7 @@ export function SeriesDetailPage() {
               languageFilter === 'all' ? 'bg-text text-white' : 'bg-surface border border-border text-text-secondary'
             }`}
           >
-            All languages
+            {t('series.allLanguages')}
           </button>
           {series.languages.map((lang) => (
             <button
@@ -97,7 +102,7 @@ export function SeriesDetailPage() {
           <div key={v.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5">
             <div className="flex-1 text-sm font-semibold flex items-center gap-2">
               <span>
-                {v.volumeNumber != null ? `Book ${v.volumeNumber}: ` : ''}
+                {v.volumeNumber != null ? `${t('common.bookNumber', { n: v.volumeNumber })}: ` : ''}
                 {v.title}
               </span>
               <LanguageBadge language={v.language} />

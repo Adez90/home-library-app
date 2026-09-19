@@ -28,6 +28,9 @@ mobile/    React Native app (later)
       separately, with series completion counted once per volume regardless of language
 - [x] Manual-entry deduplication (two "identical" hand-entered books reuse one catalog row)
 - [x] Separate dev/prod environments (`docker-compose.yml` vs `docker-compose.dev.yml`)
+- [x] Interface in English and Swedish, switchable anywhere, persisted per browser
+- [x] Security hardening: rate limiting, security headers, registration gate, required prod secrets
+- [x] End-to-end test suite (Playwright) covering real user flows, wired into CI
 - [ ] Multi-book shelf scan
 - [ ] Native app
 
@@ -50,6 +53,25 @@ Run the test suites:
 npm run backend:test              # needs DATABASE_URL reachable
 npm run web:test
 ```
+
+### End-to-end tests
+
+Real browser flows (register, add a book, series completion, wishlist, language switching)
+against the real backend, database and frontend together:
+
+```bash
+# One-time: a dedicated e2e database, kept separate from your dev data
+createdb -O library library_e2e   # or: psql -c "CREATE DATABASE library_e2e OWNER library;"
+DATABASE_URL=postgresql://library:library@localhost:5432/library_e2e \
+  npx prisma migrate deploy --schema backend/prisma/schema.prisma
+
+npx playwright install chromium   # first time only
+npx playwright test
+```
+
+`playwright.config.ts` starts the backend and frontend dev servers itself (against the
+`library_e2e` database, not your regular dev one) and tears them down after. CI runs this same
+suite against a fresh Postgres service on every push (`.github/workflows/e2e-ci.yml`).
 
 ### Docker: dev vs. prod
 
@@ -77,7 +99,7 @@ second person to the *same* household (e.g. sharing with your partner), have the
 the `inviteCode` from `GET /auth/me` (or the register/login response) — they join as a `member`
 of the same household instead of creating their own.
 
-## Multiple languages
+## Multiple book languages
 
 Owning the same title in more than one language (e.g. Sarah J. Maas in both English and
 Swedish) is fully supported — each language edition is its own catalog row (own ISBN, own
@@ -88,6 +110,34 @@ Swedish specifically."
 
 Dragon Ball vs. Dragon Ball Z, or any other same-franchise-different-series situation, needs no
 special handling — they're just two different series names, kept apart automatically.
+
+## Interface language
+
+Not to be confused with the above — this is the app's own UI text (buttons, labels, messages),
+currently English and Swedish. The switcher (EN/SV) is in the header on every page, and on the
+login/register screens before you're even signed in. The choice is saved per browser
+(`localStorage`) and defaults to Swedish automatically if the browser itself is set to Swedish.
+Adding a third language means adding one object to `web/src/lib/i18n/translations.ts` —
+TypeScript enforces it has exactly the same keys as the English one, so a missing translation
+is a build error, not a blank label in production. Server-side error messages (e.g. "Invalid
+email or password") aren't translated yet — only the static UI text.
+
+## Security
+
+- Passwords hashed with bcrypt; sessions are a JWT in an httpOnly, sameSite cookie (`secure` in
+  production), expiring after 30 days.
+- Rate limiting: a general cap on the whole API, and a much tighter one specifically on
+  `/auth/login` and `/auth/register` against brute-forcing.
+- Security headers via `@fastify/helmet` (`X-Content-Type-Options`, `X-Frame-Options`, etc.).
+- Production refuses to start without real `JWT_SECRET` / `POSTGRES_PASSWORD` values — no
+  insecure defaults survive into a real deployment.
+- **`REGISTRATION_SECRET`** (optional, recommended once your server is on the internet): without
+  it, anyone who finds your domain can register and create their own household. Set it and share
+  it only with people you want to be *able* to create a new household — joining *your* household
+  (your wife, say) only ever needs the household's own invite code, never this.
+- All database access goes through Prisma's query builder (no raw SQL), and React escapes all
+  rendered content by default (no `dangerouslySetInnerHTML` anywhere) — standard protection
+  against injection and XSS.
 
 ## Known limitations
 
