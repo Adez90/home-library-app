@@ -104,8 +104,26 @@ export function AddBookPage() {
     }
     setScanMode(mode)
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      // Resolution matters more than it sounds like it should: with no constraints, the
+      // browser is free to hand back a low-res stream (fine for a video call, not enough
+      // pixels across a barcode's bars to decode it unless the phone is held right up against
+      // the cover). Asking for 1080p gives the decoder much more to work with at a normal
+      // "holding a book up" distance instead of only right up close.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+      })
       streamRef.current = stream
+
+      // Best-effort continuous autofocus — not universally supported (notably not on
+      // Safari/iOS, which relies on the camera's own default autofocus instead), so a device
+      // that doesn't support it just keeps whatever focus behavior it already had.
+      const [track] = stream.getVideoTracks()
+      try {
+        await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] } as unknown as MediaTrackConstraints)
+      } catch {
+        // unsupported — camera's default focus behavior is used instead
+      }
+
       setScanning(true)
     } catch {
       setScanError(t('addBook.cameraError'))
