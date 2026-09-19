@@ -72,6 +72,15 @@ export function LibraryPage() {
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-2xl font-bold">{t('library.title')}</h1>
         <div className="flex items-center gap-2">
+          {!selectMode && (
+            <a
+              href="/api/household-books/export.csv"
+              download
+              className="inline-flex items-center rounded-lg border border-border text-xs sm:text-sm font-semibold px-2.5 sm:px-4 py-2"
+            >
+              {t('library.export')}
+            </a>
+          )}
           {books.length > 0 && (
             <button
               type="button"

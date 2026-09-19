@@ -263,6 +263,48 @@ export async function registerBookRoutes(app: FastifyInstance) {
     return householdBooks.map(serializeHouseholdBook);
   });
 
+  const CSV_HEADER = ['Title', 'Author', 'Series', 'Volume', 'Language', 'ISBN-13', 'ISBN-10', 'Status', 'Condition Note', 'Added At'];
+
+  function csvField(value: string | number | null | undefined): string {
+    const str = value == null ? '' : String(value);
+    return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+  }
+
+  // A plain CSV backup — every competitor in this space offers one, and it's the only way to
+  // get the catalog out of the app if the server ever goes away.
+  app.get('/household-books/export.csv', async (request, reply) => {
+    const householdId = await getPrimaryHouseholdId(request.user.userId);
+
+    const householdBooks = await prisma.householdBook.findMany({
+      where: { householdId },
+      include: { book: { include: bookInclude } },
+      orderBy: { book: { title: 'asc' } },
+    });
+
+    const rows = householdBooks.map((hb) =>
+      [
+        hb.book.title,
+        hb.book.author?.name,
+        hb.book.series?.name,
+        hb.book.volumeNumber,
+        hb.book.language,
+        hb.book.isbn13,
+        hb.book.isbn10,
+        hb.status,
+        hb.conditionNote,
+        hb.addedAt.toISOString(),
+      ]
+        .map(csvField)
+        .join(','),
+    );
+
+    const csv = [CSV_HEADER.join(','), ...rows].join('\r\n') + '\r\n';
+
+    reply.header('content-type', 'text/csv; charset=utf-8');
+    reply.header('content-disposition', 'attachment; filename="home-library.csv"');
+    return reply.send(csv);
+  });
+
   app.get('/household-books/:id', async (request, reply) => {
     const householdId = await getPrimaryHouseholdId(request.user.userId);
     const { id } = request.params as { id: string };

@@ -66,10 +66,41 @@ describe('lookupByIsbn', () => {
     expect(result?.title).toBe('Eldvägen');
   });
 
-  it('falls back to Google Books when Open Library has nothing', async () => {
+  it('falls back to LIBRIS when Open Library has nothing, for a Swedish-only title', async () => {
     const fetchImpl = vi.fn(async (url: string) => {
       if (url.includes('openlibrary.org')) {
         return jsonResponse({}, false);
+      }
+      if (url.includes('libris.kb.se/xsearch')) {
+        return jsonResponse({
+          xsearch: {
+            records: 1,
+            list: [{ title: 'Vargtimmen', creator: 'A. Lindqvist', language: 'swe' }],
+          },
+        });
+      }
+      throw new Error(`unexpected url ${url}`);
+    }) as unknown as FetchLike;
+
+    const result = await lookupByIsbn('9789100000123', fetchImpl);
+
+    expect(result).toEqual({
+      title: 'Vargtimmen',
+      authorName: 'A. Lindqvist',
+      language: 'sv',
+      isbn13: '9789100000123',
+      isbn10: undefined,
+      source: 'libris',
+    });
+  });
+
+  it('falls through past LIBRIS to Google Books when neither Open Library nor LIBRIS have it', async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (url.includes('openlibrary.org')) {
+        return jsonResponse({}, false);
+      }
+      if (url.includes('libris.kb.se')) {
+        return jsonResponse({ xsearch: { records: 0, list: [] } });
       }
       if (url.includes('googleapis.com/books')) {
         return jsonResponse({

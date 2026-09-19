@@ -7,7 +7,7 @@ export interface BookMetadata {
   volumeNumber?: number;
   language?: string;
   coverUrl?: string;
-  source: 'open-library' | 'google-books';
+  source: 'open-library' | 'libris' | 'google-books';
 }
 
 export type FetchLike = typeof fetch;
@@ -91,6 +91,35 @@ async function lookupOpenLibrary(isbn: string, fetchImpl: FetchLike): Promise<Bo
   };
 }
 
+// LIBRIS (the Swedish National Library's catalogue) fills in Swedish-language books, including
+// smaller Swedish presses, that Open Library and Google Books often don't have. Its Xsearch API
+// field names are documented loosely (public docs describe the URL shape and output formats but
+// not a full JSON schema) — this is written defensively and falls through to null on anything
+// unexpected, the same as every other provider here, so a wrong field name just means "not found"
+// rather than breaking the lookup chain.
+async function lookupLibris(isbn: string, fetchImpl: FetchLike): Promise<BookMetadata | null> {
+  const res = await fetchImpl(`https://libris.kb.se/xsearch?query=isbn:${isbn}&format=json&n=1`);
+  if (!res.ok) return null;
+  const data = (await res.json()) as {
+    xsearch?: {
+      records?: number | string;
+      list?: { title?: string; creator?: string; language?: string }[];
+    };
+  };
+
+  const record = data.xsearch?.list?.[0];
+  if (!record?.title) return null;
+
+  return {
+    title: record.title,
+    authorName: record.creator,
+    language: record.language ? marcToIso(record.language) : undefined,
+    isbn13: isbn.length === 13 ? isbn : undefined,
+    isbn10: isbn.length === 10 ? isbn : undefined,
+    source: 'libris',
+  };
+}
+
 async function lookupGoogleBooks(isbn: string, fetchImpl: FetchLike): Promise<BookMetadata | null> {
   const res = await fetchImpl(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
   if (!res.ok) return null;
@@ -124,10 +153,17 @@ export async function lookupByIsbn(isbn: string, fetchImpl: FetchLike = fetch): 
   }
 
   try {
+    const fromLibris = await lookupLibris(normalized, fetchImpl);
+    if (fromLibris) return fromLibris;
+  } catch {
+    // fall through to the next provider
+  }
+
+  try {
     const fromGoogleBooks = await lookupGoogleBooks(normalized, fetchImpl);
     if (fromGoogleBooks) return fromGoogleBooks;
   } catch {
-    // both providers failed or had nothing — caller treats this as "not found"
+    // no provider had it — caller treats this as "not found"
   }
 
   return null;

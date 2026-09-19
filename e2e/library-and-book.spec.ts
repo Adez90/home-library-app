@@ -89,6 +89,24 @@ test('bulk-selecting books removes all of them from the library at once', async 
   await expect(page.getByText('A Winter for Wolves')).toHaveCount(0);
 });
 
+test('exporting the library downloads a csv with the book in it', async ({ page }) => {
+  await addBook(page, { title: 'Export Me', author: 'C. Downloader' });
+  await page.goto('/library');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'Export CSV' }).click();
+  const download = await downloadPromise;
+
+  expect(download.suggestedFilename()).toBe('home-library.csv');
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(chunk as Buffer);
+  const csv = Buffer.concat(chunks).toString('utf-8');
+
+  expect(csv).toContain('Title,Author,Series,Volume,Language,ISBN-13,ISBN-10,Status,Condition Note,Added At');
+  expect(csv).toContain('Export Me,C. Downloader');
+});
+
 test('canceling select mode leaves the library untouched', async ({ page }) => {
   await addBook(page, { title: 'The Last Lighthouse', author: 'M. Enge' });
   await page.goto('/library');

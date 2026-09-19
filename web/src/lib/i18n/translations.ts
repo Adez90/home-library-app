@@ -51,6 +51,7 @@ const en = {
     'library.selectedCount': '{count} selected',
     'library.removeSelected': 'Remove',
     'library.removeSelectedConfirm': 'Remove {count} book(s) from your library?',
+    'library.export': 'Export CSV',
 
     'addBook.title': 'Add a book',
     'addBook.scanBarcode': 'Scan barcode',
@@ -174,6 +175,7 @@ const sv: Record<TranslationKey, string> = {
     'library.selectedCount': '{count} markerade',
     'library.removeSelected': 'Ta bort',
     'library.removeSelectedConfirm': 'Ta bort {count} bok/böcker från ditt bibliotek?',
+    'library.export': 'Exportera CSV',
 
     'addBook.title': 'Lägg till en bok',
     'addBook.scanBarcode': 'Skanna streckkod',

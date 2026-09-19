@@ -333,6 +333,53 @@ describe('household books', () => {
     expect(cleared.json().volumeNumber).toBeNull();
   });
 
+  it('exports the household library as csv', async () => {
+    vi.mocked(lookupByIsbn).mockResolvedValueOnce({
+      title: 'The Ember Road',
+      authorName: 'Mira Voss',
+      seriesName: 'The Lantern Cycle',
+      volumeNumber: 3,
+      language: 'en',
+      isbn13: '9780000000300',
+      source: 'open-library',
+    });
+    const { cookie } = await registerUser(app, 'export@example.com');
+
+    await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { isbn: '9780000000300' },
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { title: 'A "Quoted" Title, With Comma' },
+    });
+
+    const res = await app.inject({ method: 'GET', url: '/household-books/export.csv', cookies: { session: cookie } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toContain('text/csv');
+    expect(res.headers['content-disposition']).toContain('attachment');
+
+    const lines = res.body.trim().split('\r\n');
+    expect(lines[0]).toBe('Title,Author,Series,Volume,Language,ISBN-13,ISBN-10,Status,Condition Note,Added At');
+    expect(lines).toHaveLength(3);
+    expect(lines.some((l) => l.startsWith('The Ember Road,Mira Voss,The Lantern Cycle,3,en,9780000000300'))).toBe(true);
+    expect(lines.some((l) => l.includes('"A ""Quoted"" Title, With Comma"'))).toBe(true);
+  });
+
+  it('exports an empty csv with just headers for a household with no books', async () => {
+    const { cookie } = await registerUser(app, 'export-empty@example.com');
+
+    const res = await app.inject({ method: 'GET', url: '/household-books/export.csv', cookies: { session: cookie } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.trim()).toBe('Title,Author,Series,Volume,Language,ISBN-13,ISBN-10,Status,Condition Note,Added At');
+  });
+
   it('404s editing a book the household does not own', async () => {
     vi.mocked(lookupByIsbn).mockResolvedValueOnce({
       title: 'Someone Elses Book',
