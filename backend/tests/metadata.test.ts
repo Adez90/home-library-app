@@ -139,4 +139,23 @@ describe('lookupByIsbn', () => {
 
     expect(result).toBeNull();
   });
+
+  it('logs a warning per provider that throws, without failing the lookup', async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (url.includes('openlibrary.org')) throw new Error('network blip');
+      if (url.includes('libris.kb.se')) throw new Error('timeout');
+      if (url.includes('googleapis.com/books')) {
+        return jsonResponse({ items: [{ volumeInfo: { title: 'Recovered Title' } }] });
+      }
+      throw new Error(`unexpected url ${url}`);
+    }) as unknown as FetchLike;
+    const warn = vi.fn();
+
+    const result = await lookupByIsbn('9780000000009', fetchImpl, { warn });
+
+    expect(result?.title).toBe('Recovered Title');
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[0][0]).toMatchObject({ provider: 'open-library' });
+    expect(warn.mock.calls[1][0]).toMatchObject({ provider: 'libris' });
+  });
 });

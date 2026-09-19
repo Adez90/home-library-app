@@ -3,7 +3,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 // Rate limiting is disabled in the normal test env (NODE_ENV=test, see vitest.config.ts) so
 // the rest of the suite can register/log in many times quickly without tripping it. This file
 // builds its own app instance with rate limiting turned on, the same way it runs outside tests.
+// That also turns the request logger on (off only for NODE_ENV=test) — silenced here so this
+// test's deliberate non-test-env simulation doesn't spam CI output.
 process.env.NODE_ENV = 'development';
+process.env.LOG_LEVEL = 'silent';
 
 const { buildApp } = await import('../src/app.js');
 const { prisma } = await import('../src/db.js');
@@ -25,6 +28,7 @@ describe('login rate limiting', () => {
     await app.close();
     await prisma.$disconnect();
     process.env.NODE_ENV = 'test';
+    delete process.env.LOG_LEVEL;
   });
 
   it('locks out further login attempts after the limit is hit', async () => {

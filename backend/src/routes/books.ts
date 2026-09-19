@@ -161,7 +161,7 @@ export async function registerBookRoutes(app: FastifyInstance) {
       let isbn10: string | undefined;
 
       if (normalizedIsbn) {
-        const metadata = await lookupByIsbn(normalizedIsbn);
+        const metadata = await lookupByIsbn(normalizedIsbn, undefined, request.log);
         if (metadata) {
           resolvedTitle = metadata.title;
           resolvedAuthorName = metadata.authorName ?? resolvedAuthorName;

@@ -7,8 +7,28 @@ import { registerAuthRoutes } from './routes/auth.js';
 import { registerBookRoutes } from './routes/books.js';
 import { registerSeriesRoutes } from './routes/series.js';
 import { registerFavoriteRoutes } from './routes/favorites.js';
+import { captureException } from './lib/sentry.js';
 
 const JWT_MAX_AGE = '30d';
+
+// Structured logging via Fastify's built-in pino instance — this used to be `logger: false`,
+// which meant zero visibility into requests or errors on a deployed server. Off in tests only:
+// tests legitimately trigger a lot of expected 4xx/error paths and don't need that noise.
+function loggerConfig() {
+  if (process.env.NODE_ENV === 'test') return false;
+  const isProd = process.env.NODE_ENV === 'production';
+  return {
+    level: process.env.LOG_LEVEL ?? (isProd ? 'info' : 'debug'),
+    // Pretty-printed in dev for a human reading a terminal; plain JSON in prod, which is what
+    // log aggregators (docker logs, journald, etc.) want to ingest.
+    transport: isProd ? undefined : { target: 'pino-pretty', options: { colorize: true, translateTime: 'HH:MM:ss', ignore: 'pid,hostname' } },
+    // Never let a session cookie or bearer token end up in a log line.
+    redact: {
+      paths: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]'],
+      censor: '[redacted]',
+    },
+  };
+}
 
 function requiredJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
@@ -22,7 +42,11 @@ function requiredJwtSecret(): string {
 }
 
 export function buildApp() {
-  const app = Fastify({ logger: false });
+  const app = Fastify({ logger: loggerConfig() });
+
+  app.addHook('onError', async (_request, _reply, error) => {
+    captureException(error);
+  });
 
   app.register(helmet);
   // A generous baseline against blunt abuse; auth routes get a much tighter limit below.

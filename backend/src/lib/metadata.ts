@@ -142,28 +142,42 @@ async function lookupGoogleBooks(isbn: string, fetchImpl: FetchLike): Promise<Bo
   };
 }
 
-export async function lookupByIsbn(isbn: string, fetchImpl: FetchLike = fetch): Promise<BookMetadata | null> {
+// A provider failing is expected sometimes (no record for this ISBN, a timeout) and always
+// falls through silently to the next one — that behavior doesn't change. But "expected" isn't
+// the same as "invisible": logging at warn means a provider that's misbehaving systematically
+// (wrong field mapping, an outage) shows up in the logs instead of just quietly degrading to
+// worse metadata forever. No logger given (e.g. in tests) is a safe no-op.
+export interface MinimalLogger {
+  warn: (obj: unknown, msg?: string) => void;
+}
+const noopLogger: MinimalLogger = { warn: () => {} };
+
+export async function lookupByIsbn(
+  isbn: string,
+  fetchImpl: FetchLike = fetch,
+  log: MinimalLogger = noopLogger,
+): Promise<BookMetadata | null> {
   const normalized = isbn.replace(/[^0-9Xx]/g, '');
 
   try {
     const fromOpenLibrary = await lookupOpenLibrary(normalized, fetchImpl);
     if (fromOpenLibrary) return fromOpenLibrary;
-  } catch {
-    // fall through to the next provider
+  } catch (err) {
+    log.warn({ err, provider: 'open-library', isbn: normalized }, 'ISBN metadata provider failed');
   }
 
   try {
     const fromLibris = await lookupLibris(normalized, fetchImpl);
     if (fromLibris) return fromLibris;
-  } catch {
-    // fall through to the next provider
+  } catch (err) {
+    log.warn({ err, provider: 'libris', isbn: normalized }, 'ISBN metadata provider failed');
   }
 
   try {
     const fromGoogleBooks = await lookupGoogleBooks(normalized, fetchImpl);
     if (fromGoogleBooks) return fromGoogleBooks;
-  } catch {
-    // no provider had it — caller treats this as "not found"
+  } catch (err) {
+    log.warn({ err, provider: 'google-books', isbn: normalized }, 'ISBN metadata provider failed');
   }
 
   return null;

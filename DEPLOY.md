@@ -35,6 +35,10 @@ refuses to start without them (no insecure default in production). Also set
 own household on your server. Once it's set, only someone who knows that value can start a *new*
 household; your wife joining *yours* still only needs the invite code from step 6, never this.
 
+`SENTRY_DSN` / `VITE_SENTRY_DSN` and `LOG_LEVEL` are optional — see
+[Error tracking](#error-tracking-optional) below. Leave them blank for now if you just want to
+get the app running; you can add them and re-run `docker compose up -d --build` any time later.
+
 ## 4. Build and start the app
 
 ```bash
@@ -121,7 +125,28 @@ for a personal deployment like this.
 ## Logs / troubleshooting
 
 ```bash
-docker compose logs -f api      # backend logs
+docker compose logs -f api      # backend logs — one JSON line per request/error
 docker compose logs -f web      # nginx access/error logs
 docker compose ps               # container status
 ```
+
+The backend logs every request (method, path, status code, response time) and every error with
+its full stack trace, as one JSON object per line — pipe through `jq` for readability, e.g.
+`docker compose logs -f api | jq .`. Verbosity is controlled by `LOG_LEVEL` in `.env` (`info` by
+default; `debug` shows more, including which ISBN metadata provider was tried and why it fell
+through to the next one).
+
+## Error tracking (optional)
+
+Set `SENTRY_DSN` (backend) and/or `VITE_SENTRY_DSN` (web app) in `.env` to send unhandled
+errors to a [Sentry](https://sentry.io) project instead of only your server's local logs — useful
+once you're not the one who'll notice something's broken. Both are independent and both optional;
+leave either blank to skip it, nothing else about the app changes.
+
+1. In Sentry, create a project for the backend (platform: Node/Fastify — or just Node) and copy
+   its DSN into `SENTRY_DSN`. Create a second project for the web app (platform: React) and copy
+   its DSN into `VITE_SENTRY_DSN` — the frontend one is baked into the built JS at build time, so
+   it needs `--build` to take effect, not just a restart.
+2. `docker compose up -d --build`.
+
+That's it — no code changes needed either way.
