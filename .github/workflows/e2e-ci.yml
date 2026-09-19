@@ -54,6 +54,7 @@ jobs:
 
       - run: npm install
       - run: npx playwright install --with-deps chromium
+      - run: npx prisma generate --schema backend/prisma/schema.prisma
       - run: npx prisma migrate deploy --schema backend/prisma/schema.prisma
       - run: npx playwright test
 

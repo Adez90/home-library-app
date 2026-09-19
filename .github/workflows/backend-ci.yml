@@ -47,6 +47,7 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - run: npm install
+      - run: npx prisma generate --schema backend/prisma/schema.prisma
       - run: npx prisma migrate deploy --schema backend/prisma/schema.prisma
       - run: npx tsc -p backend/tsconfig.json --noEmit
       - run: npm test --workspace backend
