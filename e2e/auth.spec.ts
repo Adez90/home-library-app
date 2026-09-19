@@ -30,14 +30,12 @@ test('logs in with the right password and rejects the wrong one', async ({ page 
   await expect(page).toHaveURL(/\/library/);
 });
 
-test('a second person joins the same household with the invite code', async ({ page, request }) => {
+test('a second person joins the same household with the invite code', async ({ page }) => {
   const ownerEmail = uniqueEmail('auth-owner');
   await registerHousehold(page, { name: 'Owner', email: ownerEmail, householdName: 'Shared library' });
 
-  const me = await request.get('http://localhost:3002/auth/me', {
-    headers: { cookie: (await page.context().cookies()).map((c) => `${c.name}=${c.value}`).join('; ') },
-  });
-  const inviteCode = (await me.json()).households[0].inviteCode;
+  await page.getByRole('button', { name: 'Shared library' }).click();
+  const inviteCode = await page.locator('code').innerText();
 
   await page.getByRole('button', { name: 'Log out' }).click();
 
@@ -52,4 +50,21 @@ test('a second person joins the same household with the invite code', async ({ p
 
   await expect(page).toHaveURL(/\/library/);
   await expect(page.getByText('Shared library')).toBeVisible();
+});
+
+test('the invite code is visible and copyable from the household menu', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await registerHousehold(page, { name: 'Code Reader', email: uniqueEmail('auth-code'), householdName: "Code Reader's library" });
+
+  await expect(page.getByText('Invite code')).toHaveCount(0);
+  await page.getByRole('button', { name: "Code Reader's library" }).click();
+  await expect(page.getByText('Invite code')).toBeVisible();
+
+  const code = await page.locator('code').innerText();
+  expect(code.length).toBeGreaterThan(0);
+
+  await page.getByRole('button', { name: 'Copy' }).click();
+  await expect(page.getByRole('button', { name: 'Copied!' })).toBeVisible();
+  const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+  expect(clipboardText).toBe(code);
 });

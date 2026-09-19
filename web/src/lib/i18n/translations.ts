@@ -5,6 +5,10 @@ const en = {
     'nav.wishlist': 'Wishlist',
     'nav.logout': 'Log out',
     'nav.defaultHouseholdName': 'Home Library',
+    'nav.inviteCode': 'Invite code',
+    'nav.inviteHint': 'Share this code so someone else can join your household.',
+    'nav.copyCode': 'Copy',
+    'nav.copied': 'Copied!',
 
     'common.loading': 'Loading…',
     'common.optional': '(optional)',
@@ -129,6 +133,10 @@ const sv: Record<TranslationKey, string> = {
     'nav.wishlist': 'Önskelista',
     'nav.logout': 'Logga ut',
     'nav.defaultHouseholdName': 'Hembibliotek',
+    'nav.inviteCode': 'Inbjudningskod',
+    'nav.inviteHint': 'Dela den här koden så att någon annan kan gå med i ditt hushåll.',
+    'nav.copyCode': 'Kopiera',
+    'nav.copied': 'Kopierad!',
 
     'common.loading': 'Laddar…',
     'common.optional': '(valfritt)',

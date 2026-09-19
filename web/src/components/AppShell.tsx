@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import type { ComponentType, SVGProps } from 'react'
 import { LibraryIcon, ScanIcon, SeriesIcon, HeartIcon } from './icons'
 import { LanguageSwitcher } from './LanguageSwitcher'
+import { HouseholdMenu } from './HouseholdMenu'
 import { useAuth } from '../lib/auth'
 import { useTranslation } from '../lib/i18n'
 import type { TranslationKey } from '../lib/i18n/translations'
@@ -26,9 +27,11 @@ export function AppShell() {
     <div className="min-h-svh flex flex-col">
       <header className="border-b border-border bg-surface">
         <div className="mx-auto max-w-5xl flex items-center justify-between px-4 py-3 md:px-6 gap-3">
-          <span className="font-heading text-lg font-semibold">
-            {household ? household.name : t('nav.defaultHouseholdName')}
-          </span>
+          {household ? (
+            <HouseholdMenu household={household} />
+          ) : (
+            <span className="font-heading text-lg font-semibold">{t('nav.defaultHouseholdName')}</span>
+          )}
 
           <nav className="hidden md:flex items-center gap-6">
             {NAV_ITEMS.map(({ to, labelKey, icon: ItemIcon }) => (
