@@ -1,14 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BarcodeDetector } from 'barcode-detector/pure'
 import { api, ApiError } from '../lib/api'
 import type { HouseholdBook } from '../lib/types'
 import { ScanIcon } from '../components/icons'
 import { useTranslation } from '../lib/i18n'
-
-// Not every browser exposes this yet — feature-detected, never assumed.
-type BarcodeDetectorCtor = new (options: { formats: string[] }) => {
-  detect: (source: CanvasImageSource) => Promise<{ rawValue: string }[]>
-}
 
 export function AddBookPage() {
   const navigate = useNavigate()
@@ -29,7 +25,10 @@ export function AddBookPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
 
-  const scanSupported = typeof window !== 'undefined' && 'BarcodeDetector' in window
+  // The camera itself (getUserMedia) is the real requirement — barcode decoding runs via the
+  // barcode-detector ponyfill (zxing-wasm), which works the same in every modern browser
+  // including Safari/iOS, so there's no browser-specific feature to check for that anymore.
+  const scanSupported = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
 
   useEffect(() => {
     return () => {
@@ -37,35 +36,47 @@ export function AddBookPage() {
     }
   }, [])
 
+  // Attaching the stream and starting detection has to happen in an effect keyed on `scanning`,
+  // not inline in startScan: the <video> element only exists once React has re-rendered with
+  // scanning=true, so reading videoRef.current synchronously right after setScanning(true) (the
+  // previous approach) always found it null — the stream was captured but never shown, a
+  // permanently black preview.
+  useEffect(() => {
+    if (!scanning || !streamRef.current || !videoRef.current) return
+    const video = videoRef.current
+    video.srcObject = streamRef.current
+    video.play().catch(() => {})
+
+    const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] })
+    let cancelled = false
+
+    const tick = async () => {
+      if (cancelled || !streamRef.current) return
+      try {
+        const codes = await detector.detect(video)
+        if (codes.length > 0) {
+          setIsbn(codes[0].rawValue)
+          stopScan()
+          return
+        }
+      } catch {
+        // keep trying on transient detector errors
+      }
+      if (!cancelled) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+
+    return () => {
+      cancelled = true
+    }
+  }, [scanning])
+
   async function startScan() {
     setScanError(null)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
       streamRef.current = stream
       setScanning(true)
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
-      }
-
-      const Detector = (window as unknown as { BarcodeDetector: BarcodeDetectorCtor }).BarcodeDetector
-      const detector = new Detector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] })
-
-      const tick = async () => {
-        if (!videoRef.current || !streamRef.current) return
-        try {
-          const codes = await detector.detect(videoRef.current)
-          if (codes.length > 0) {
-            setIsbn(codes[0].rawValue)
-            stopScan()
-            return
-          }
-        } catch {
-          // keep trying on transient detector errors
-        }
-        if (streamRef.current) requestAnimationFrame(tick)
-      }
-      requestAnimationFrame(tick)
     } catch {
       setScanError(t('addBook.cameraError'))
       setScanning(false)
