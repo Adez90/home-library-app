@@ -24,6 +24,7 @@ export function AddBookPage() {
   const [seriesName, setSeriesName] = useState('')
   const [volumeNumber, setVolumeNumber] = useState('')
   const [language, setLanguage] = useState('')
+  const [format, setFormat] = useState('')
   const [showSeriesFields, setShowSeriesFields] = useState(false)
   const [needsManualEntry, setNeedsManualEntry] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -153,6 +154,7 @@ export function AddBookPage() {
       if (seriesName) payload.seriesName = seriesName.trim()
       if (volumeNumber) payload.volumeNumber = volumeNumber.trim()
       if (language) payload.language = language.trim()
+      if (format) payload.format = format.trim()
 
       const added = await api.post<HouseholdBook>('/household-books', payload)
       navigate(`/library/${added.id}`)
@@ -292,6 +294,21 @@ export function AddBookPage() {
               <datalist id="language-options">
                 <option value="en">{t('addBook.languageEnglish')}</option>
                 <option value="sv">{t('addBook.languageSwedish')}</option>
+              </datalist>
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-medium">
+              {t('addBook.format')} <span className="text-text-secondary font-normal">{t('common.optional')}</span>
+              <input
+                list="format-options"
+                value={format}
+                onChange={(e) => setFormat(e.target.value)}
+                placeholder={t('addBook.formatPlaceholder')}
+                className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
+              />
+              <datalist id="format-options">
+                <option value={t('addBook.formatPaperback')} />
+                <option value={t('addBook.formatHardback')} />
+                <option value={t('addBook.formatPocket')} />
               </datalist>
             </label>
           </>

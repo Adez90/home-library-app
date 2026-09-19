@@ -18,6 +18,7 @@ const item: HouseholdBook = {
     coverUrl: null,
     volumeNumber: 3,
     language: 'en',
+    format: null,
     author: { id: 'a1', name: 'Mira Voss' },
     series: null,
   },

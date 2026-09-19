@@ -16,6 +16,7 @@ const addBookSchema = z
     seriesName: z.string().min(1).optional(),
     volumeNumber: z.coerce.number().int().positive().optional(),
     language: z.string().min(2).max(8).optional(),
+    format: z.string().min(1).max(100).optional(),
     status: z.enum(STATUSES).default('owned'),
   })
   .refine((data) => data.isbn || data.title, { message: 'Provide either isbn or title' })
@@ -44,6 +45,7 @@ const updateBookDetailsSchema = z.object({
   seriesName: z.string().max(200).optional(),
   volumeNumber: z.union([z.coerce.number().int().positive(), z.null()]).optional(),
   language: z.string().max(8).optional(),
+  format: z.string().max(100).optional(),
   coverUrl: z.string().max(2000).optional(),
 });
 
@@ -54,11 +56,21 @@ function normalizeIsbn(isbn: string) {
 // Only reachable when there's no ISBN to key off (manual entry, or a scanned ISBN with no
 // metadata match). Reuses an existing catalog row with an exact match on the fields that
 // distinguish one edition from another, so two "the same book" manual adds — by the same
-// household or a different one — don't create duplicate rows. Different languages are
-// legitimately different editions and are NOT merged.
+// household or a different one — don't create duplicate rows. Different languages, and
+// different formats (a paperback and a hardback really are different editions, same as a
+// different ISBN would be), are legitimately different editions and are NOT merged — this
+// also means a household can own both a paperback and hardback of the same book as two
+// distinct library entries, which is exactly the point of tracking format at all.
 async function findExistingBookByDetails(
   tx: Prisma.TransactionClient,
-  details: { title: string; authorId: string | null; seriesId: string | null; volumeNumber: number | null; language: string | null },
+  details: {
+    title: string;
+    authorId: string | null;
+    seriesId: string | null;
+    volumeNumber: number | null;
+    language: string | null;
+    format: string | null;
+  },
 ) {
   return tx.book.findFirst({
     where: {
@@ -67,6 +79,7 @@ async function findExistingBookByDetails(
       seriesId: details.seriesId,
       volumeNumber: details.volumeNumber,
       language: details.language,
+      format: details.format,
       isbn13: null,
       isbn10: null,
     },
@@ -83,6 +96,7 @@ function serializeBook(book: {
   coverUrl: string | null;
   volumeNumber: number | null;
   language: string | null;
+  format: string | null;
   author: { id: string; name: string } | null;
   series: { id: string; name: string } | null;
 }) {
@@ -94,6 +108,7 @@ function serializeBook(book: {
     coverUrl: book.coverUrl,
     volumeNumber: book.volumeNumber,
     language: book.language,
+    format: book.format,
     author: book.author,
     series: book.series,
   };
@@ -112,6 +127,7 @@ function serializeHouseholdBook(hb: {
     coverUrl: string | null;
     volumeNumber: number | null;
     language: string | null;
+    format: string | null;
     author: { id: string; name: string } | null;
     series: { id: string; name: string } | null;
   };
@@ -129,6 +145,7 @@ function serializeHouseholdBook(hb: {
       coverUrl: hb.book.coverUrl,
       volumeNumber: hb.book.volumeNumber,
       language: hb.book.language,
+      format: hb.book.format,
       author: hb.book.author,
       series: hb.book.series,
     },
@@ -150,6 +167,7 @@ export async function registerBookRoutes(app: FastifyInstance) {
       seriesName: manualSeriesName,
       volumeNumber: manualVolumeNumber,
       language: manualLanguage,
+      format: manualFormat,
       status,
     } = parsed.data;
     const householdId = await getPrimaryHouseholdId(request.user.userId);
@@ -166,6 +184,7 @@ export async function registerBookRoutes(app: FastifyInstance) {
       let seriesName: string | undefined;
       let volumeNumber: number | undefined;
       let language: string | undefined;
+      let format: string | undefined;
       let coverUrl: string | undefined;
       let isbn13: string | undefined;
       let isbn10: string | undefined;
@@ -178,6 +197,7 @@ export async function registerBookRoutes(app: FastifyInstance) {
           seriesName = metadata.seriesName;
           volumeNumber = metadata.volumeNumber;
           language = metadata.language;
+          format = metadata.format;
           coverUrl = metadata.coverUrl;
           isbn13 = metadata.isbn13 ?? (normalizedIsbn.length === 13 ? normalizedIsbn : undefined);
           isbn10 = metadata.isbn10 ?? (normalizedIsbn.length === 10 ? normalizedIsbn : undefined);
@@ -195,10 +215,12 @@ export async function registerBookRoutes(app: FastifyInstance) {
         return reply.code(404).send({ error: 'No book found for that ISBN. Try entering the title manually.' });
       }
 
-      // Manual series/language info always wins — it's what the person is telling us, not a guess.
+      // Manual series/language/format info always wins — it's what the person is telling us,
+      // not a guess.
       seriesName = manualSeriesName ?? seriesName;
       volumeNumber = manualVolumeNumber ?? volumeNumber;
       language = manualLanguage ?? language;
+      format = manualFormat ?? format;
 
       book = await prisma.$transaction(async (tx) => {
         const author = resolvedAuthorName ? await findOrCreateAuthor(tx, resolvedAuthorName) : null;
@@ -213,6 +235,7 @@ export async function registerBookRoutes(app: FastifyInstance) {
             seriesId: series?.id ?? null,
             volumeNumber: volumeNumber ?? null,
             language: language ?? null,
+            format: format ?? null,
           });
           if (existingManual) return existingManual;
         }
@@ -225,6 +248,7 @@ export async function registerBookRoutes(app: FastifyInstance) {
             coverUrl,
             volumeNumber,
             language,
+            format,
             authorId: author?.id,
             seriesId: series?.id,
           },
@@ -273,7 +297,7 @@ export async function registerBookRoutes(app: FastifyInstance) {
     return householdBooks.map(serializeHouseholdBook);
   });
 
-  const CSV_HEADER = ['Title', 'Author', 'Series', 'Volume', 'Language', 'ISBN-13', 'ISBN-10', 'Status', 'Condition Note', 'Added At'];
+  const CSV_HEADER = ['Title', 'Author', 'Series', 'Volume', 'Language', 'Format', 'ISBN-13', 'ISBN-10', 'Status', 'Condition Note', 'Added At'];
 
   function csvField(value: string | number | null | undefined): string {
     const str = value == null ? '' : String(value);
@@ -298,6 +322,7 @@ export async function registerBookRoutes(app: FastifyInstance) {
         hb.book.series?.name,
         hb.book.volumeNumber,
         hb.book.language,
+        hb.book.format,
         hb.book.isbn13,
         hb.book.isbn10,
         hb.status,
@@ -382,7 +407,7 @@ export async function registerBookRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Not found' });
     }
 
-    const { title, authorName, seriesName, volumeNumber, language, coverUrl } = parsed.data;
+    const { title, authorName, seriesName, volumeNumber, language, format, coverUrl } = parsed.data;
 
     // Same rule as adding a book (see addBookSchema): setting a non-empty series without a
     // book number silently orphans it from series completion tracking. This is a PATCH, so
@@ -431,6 +456,7 @@ export async function registerBookRoutes(app: FastifyInstance) {
       }
 
       if (language !== undefined) data.language = language.trim() || null;
+      if (format !== undefined) data.format = format.trim() || null;
       if (coverUrl !== undefined) data.coverUrl = coverUrl.trim() || null;
 
       return tx.book.update({ where: { id }, data, include: bookInclude });

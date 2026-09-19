@@ -103,7 +103,7 @@ test('exporting the library downloads a csv with the book in it', async ({ page 
   for await (const chunk of stream) chunks.push(chunk as Buffer);
   const csv = Buffer.concat(chunks).toString('utf-8');
 
-  expect(csv).toContain('Title,Author,Series,Volume,Language,ISBN-13,ISBN-10,Status,Condition Note,Added At');
+  expect(csv).toContain('Title,Author,Series,Volume,Language,Format,ISBN-13,ISBN-10,Status,Condition Note,Added At');
   expect(csv).toContain('Export Me,C. Downloader');
 });
 
@@ -115,6 +115,20 @@ test('canceling select mode leaves the library untouched', async ({ page }) => {
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   await expect(page.getByRole('link', { name: /The Last Lighthouse/ })).toBeVisible();
+});
+
+test('setting a format shows up on the book detail page and survives editing', async ({ page }) => {
+  await addBook(page, { title: 'The Hobbit', author: 'J.R.R. Tolkien', format: 'Hardback' });
+
+  await expect(page.getByText('Hardback')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Edit details' }).click();
+  await expect(page.getByLabel(/^Format/)).toHaveValue('Hardback');
+  await page.getByLabel(/^Format/).fill('Paperback');
+  await page.getByRole('button', { name: 'Save' }).click();
+
+  await expect(page.getByText('Paperback')).toBeVisible();
+  await expect(page.getByText('Hardback')).toHaveCount(0);
 });
 
 test('naming a series without a book number blocks submission until one is given', async ({ page }) => {

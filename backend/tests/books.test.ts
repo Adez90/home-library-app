@@ -193,6 +193,62 @@ describe('household books', () => {
     expect(swedish.json().book.language).toBe('sv');
   });
 
+  it('does not merge the same manual title across different formats, and lets a household own both', async () => {
+    const { cookie } = await registerUser(app, 'formats@example.com');
+    const base = { title: 'The Hobbit', authorName: 'J.R.R. Tolkien' };
+
+    const paperback = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { ...base, format: 'Paperback' },
+    });
+    const hardback = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { ...base, format: 'Hardback' },
+    });
+
+    expect(paperback.statusCode).toBe(201);
+    expect(hardback.statusCode).toBe(201);
+    expect(paperback.json().book.id).not.toBe(hardback.json().book.id);
+    expect(paperback.json().book.format).toBe('Paperback');
+    expect(hardback.json().book.format).toBe('Hardback');
+  });
+
+  it('resolves format from metadata but lets a manual format override it', async () => {
+    const { cookie } = await registerUser(app, 'formatmeta@example.com');
+
+    vi.mocked(lookupByIsbn).mockResolvedValueOnce({
+      title: 'The Fellowship of the Ring',
+      format: 'Paperback',
+      isbn13: '9780000000601',
+      source: 'open-library',
+    });
+    const fromMetadata = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { isbn: '9780000000601' },
+    });
+    expect(fromMetadata.json().book.format).toBe('Paperback');
+
+    vi.mocked(lookupByIsbn).mockResolvedValueOnce({
+      title: 'The Two Towers',
+      format: 'Paperback',
+      isbn13: '9780000000602',
+      source: 'open-library',
+    });
+    const overridden = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { isbn: '9780000000602', format: 'Hardback' },
+    });
+    expect(overridden.json().book.format).toBe('Hardback');
+  });
+
   it('rejects adding the same book twice', async () => {
     vi.mocked(lookupByIsbn).mockResolvedValue({ title: 'Dup Book', source: 'open-library', isbn13: '9780000000099' });
     const { cookie } = await registerUser(app, 'e@example.com');
@@ -301,11 +357,19 @@ describe('household books', () => {
       method: 'PATCH',
       url: `/books/${bookId}`,
       cookies: { session: alice.cookie },
-      payload: { title: 'The Correct Title', authorName: 'Right Author', language: 'en' },
+      payload: { title: 'The Correct Title', authorName: 'Right Author', language: 'en', format: 'Hardback' },
     });
     expect(fixed.statusCode).toBe(200);
-    expect(fixed.json()).toMatchObject({ title: 'The Correct Title', language: 'en' });
+    expect(fixed.json()).toMatchObject({ title: 'The Correct Title', language: 'en', format: 'Hardback' });
     expect(fixed.json().author.name).toBe('Right Author');
+
+    const clearedFormat = await app.inject({
+      method: 'PATCH',
+      url: `/books/${bookId}`,
+      cookies: { session: alice.cookie },
+      payload: { format: '' },
+    });
+    expect(clearedFormat.json().format).toBeNull();
 
     const bobsCopy = await app.inject({
       method: 'GET',
@@ -415,9 +479,9 @@ describe('household books', () => {
     expect(res.headers['content-disposition']).toContain('attachment');
 
     const lines = res.body.trim().split('\r\n');
-    expect(lines[0]).toBe('Title,Author,Series,Volume,Language,ISBN-13,ISBN-10,Status,Condition Note,Added At');
+    expect(lines[0]).toBe('Title,Author,Series,Volume,Language,Format,ISBN-13,ISBN-10,Status,Condition Note,Added At');
     expect(lines).toHaveLength(3);
-    expect(lines.some((l) => l.startsWith('The Ember Road,Mira Voss,The Lantern Cycle,3,en,9780000000300'))).toBe(true);
+    expect(lines.some((l) => l.startsWith('The Ember Road,Mira Voss,The Lantern Cycle,3,en,,9780000000300'))).toBe(true);
     expect(lines.some((l) => l.includes('"A ""Quoted"" Title, With Comma"'))).toBe(true);
   });
 
@@ -427,7 +491,7 @@ describe('household books', () => {
     const res = await app.inject({ method: 'GET', url: '/household-books/export.csv', cookies: { session: cookie } });
 
     expect(res.statusCode).toBe(200);
-    expect(res.body.trim()).toBe('Title,Author,Series,Volume,Language,ISBN-13,ISBN-10,Status,Condition Note,Added At');
+    expect(res.body.trim()).toBe('Title,Author,Series,Volume,Language,Format,ISBN-13,ISBN-10,Status,Condition Note,Added At');
   });
 
   it('404s editing a book the household does not own', async () => {

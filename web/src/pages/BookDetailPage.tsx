@@ -4,6 +4,7 @@ import { api, ApiError } from '../lib/api'
 import type { BookStatus, HouseholdBook } from '../lib/types'
 import { ChevronLeftIcon, HeartIcon } from '../components/icons'
 import { LanguageBadge } from '../components/LanguageBadge'
+import { FormatBadge } from '../components/FormatBadge'
 import { useTranslation } from '../lib/i18n'
 import type { TranslationKey } from '../lib/i18n/translations'
 
@@ -29,6 +30,7 @@ export function BookDetailPage() {
   const [editSeries, setEditSeries] = useState('')
   const [editVolume, setEditVolume] = useState('')
   const [editLanguage, setEditLanguage] = useState('')
+  const [editFormat, setEditFormat] = useState('')
   const [editCoverUrl, setEditCoverUrl] = useState('')
   const [savingDetails, setSavingDetails] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
@@ -48,6 +50,7 @@ export function BookDetailPage() {
     setEditSeries(item.book.series?.name ?? '')
     setEditVolume(item.book.volumeNumber != null ? String(item.book.volumeNumber) : '')
     setEditLanguage(item.book.language ?? '')
+    setEditFormat(item.book.format ?? '')
     setEditCoverUrl(item.book.coverUrl ?? '')
     setEditError(null)
     setEditing(true)
@@ -65,6 +68,7 @@ export function BookDetailPage() {
       authorName: editAuthor.trim(),
       seriesName: trimmedSeries,
       language: editLanguage.trim(),
+      format: editFormat.trim(),
       coverUrl: editCoverUrl.trim(),
     }
     if (trimmedSeries) {
@@ -206,6 +210,21 @@ export function BookDetailPage() {
             </datalist>
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
+            {t('addBook.format')} <span className="text-text-secondary font-normal">{t('common.optional')}</span>
+            <input
+              list="edit-format-options"
+              value={editFormat}
+              onChange={(e) => setEditFormat(e.target.value)}
+              placeholder={t('addBook.formatPlaceholder')}
+              className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
+            />
+            <datalist id="edit-format-options">
+              <option value={t('addBook.formatPaperback')} />
+              <option value={t('addBook.formatHardback')} />
+              <option value={t('addBook.formatPocket')} />
+            </datalist>
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium">
             {t('bookDetail.coverUrl')} <span className="text-text-secondary font-normal">{t('common.optional')}</span>
             <input
               value={editCoverUrl}
@@ -238,6 +257,7 @@ export function BookDetailPage() {
           <div className="flex items-center justify-center gap-2">
             <h1 className="font-heading text-xl font-bold">{book.title}</h1>
             <LanguageBadge language={book.language} />
+            <FormatBadge format={book.format} />
           </div>
           {book.author && (
             <div className="flex items-center justify-center gap-2 text-sm text-text-secondary mt-1">

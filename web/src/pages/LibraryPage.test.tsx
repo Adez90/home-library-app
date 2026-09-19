@@ -20,6 +20,7 @@ function book(id: string, title: string): HouseholdBook {
       coverUrl: `https://example.com/${id}.jpg`,
       volumeNumber: null,
       language: 'en',
+      format: null,
       author: { id: 'a1', name: 'Mira Voss' },
       series: null,
     },

@@ -6,6 +6,7 @@ export interface BookMetadata {
   seriesName?: string;
   volumeNumber?: number;
   language?: string;
+  format?: string;
   coverUrl?: string;
   source: 'open-library' | 'libris' | 'google-books';
 }
@@ -59,6 +60,7 @@ async function lookupOpenLibrary(isbn: string, fetchImpl: FetchLike): Promise<Bo
     isbn_10?: string[];
     series?: string[];
     languages?: { key: string }[];
+    physical_format?: string;
   };
   if (!edition.title) return null;
 
@@ -86,6 +88,7 @@ async function lookupOpenLibrary(isbn: string, fetchImpl: FetchLike): Promise<Bo
     isbn13: edition.isbn_13?.[0],
     isbn10: edition.isbn_10?.[0],
     language,
+    format: edition.physical_format,
     coverUrl: edition.covers?.[0] ? `https://covers.openlibrary.org/b/id/${edition.covers[0]}-L.jpg` : undefined,
     source: 'open-library',
   };

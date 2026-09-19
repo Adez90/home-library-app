@@ -21,12 +21,13 @@ export async function registerHousehold(
 
 export async function addBook(
   page: Page,
-  opts: { title: string; author?: string; series?: string; volume?: number; language?: string },
+  opts: { title: string; author?: string; series?: string; volume?: number; language?: string; format?: string },
 ) {
   await page.goto('/add');
   await page.getByLabel(/^Title/).fill(opts.title);
   if (opts.author) await page.getByLabel(/^Author/).fill(opts.author);
   if (opts.language) await page.getByLabel(/^Language/).fill(opts.language);
+  if (opts.format) await page.getByLabel(/^Format/).fill(opts.format);
   if (opts.series) {
     await page.getByRole('button', { name: '+ Add series info' }).click();
     await page.getByLabel(/^Series/).fill(opts.series);

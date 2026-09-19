@@ -26,6 +26,9 @@ mobile/    React Native app (later)
 - [x] Web frontend (login, scan/add, library, series, wishlist)
 - [x] Multi-language editions (e.g. an English and a Swedish copy of the same book) tracked
       separately, with series completion counted once per volume regardless of language
+- [x] Optional format/edition attribute (paperback, hardback, pocket — free text), tracked the
+      same way as language: a paperback and hardback of the same book are separate catalog rows,
+      so a household can own both, but still count as one completed series slot
 - [x] Manual-entry deduplication (two "identical" hand-entered books reuse one catalog row)
 - [x] Separate dev/prod environments (`docker-compose.yml` vs `docker-compose.dev.yml`)
 - [x] Interface in English and Swedish, switchable anywhere, persisted per browser

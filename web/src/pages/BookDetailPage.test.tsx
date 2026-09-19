@@ -20,6 +20,7 @@ function item(): HouseholdBook {
       coverUrl: null,
       volumeNumber: null,
       language: null,
+      format: null,
       author: { id: 'a1', name: 'Wrong Author' },
       series: null,
     },
@@ -46,6 +47,7 @@ function mockFetch(initial: HouseholdBook) {
             title: body.title ?? current.book.title,
             author: body.authorName ? { id: 'a1', name: body.authorName } : current.book.author,
             language: body.language || null,
+            format: body.format || null,
           },
         }
         return { ok: true, status: 200, json: async () => current.book } as Response
@@ -89,15 +91,18 @@ describe('BookDetailPage edit details', () => {
     await userEvent.clear(authorInput)
     await userEvent.type(authorInput, 'Right Author')
 
+    await userEvent.type(screen.getByLabelText(/^Format/), 'Hardback')
+
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'The Correct Title' })).toBeInTheDocument()
     })
     expect(screen.getByText('Right Author')).toBeInTheDocument()
+    expect(screen.getByText('Hardback')).toBeInTheDocument()
     expect(patchCalls).toHaveLength(1)
     expect(patchCalls[0].url).toContain('/books/b1')
-    expect(patchCalls[0].body).toMatchObject({ title: 'The Correct Title', authorName: 'Right Author' })
+    expect(patchCalls[0].body).toMatchObject({ title: 'The Correct Title', authorName: 'Right Author', format: 'Hardback' })
   })
 
   it('cancels out of edit mode without saving', async () => {

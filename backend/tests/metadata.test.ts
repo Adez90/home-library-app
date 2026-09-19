@@ -43,6 +43,24 @@ describe('lookupByIsbn', () => {
     });
   });
 
+  it('resolves the physical format from Open Library when the edition has one', async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (url.includes('openlibrary.org/isbn/')) {
+        return jsonResponse({
+          title: 'The Ember Road',
+          isbn_13: ['9789100123457'],
+          languages: [{ key: '/languages/eng' }],
+          physical_format: 'Paperback',
+        });
+      }
+      throw new Error(`unexpected url ${url}`);
+    }) as unknown as FetchLike;
+
+    const result = await lookupByIsbn('9789100123457', fetchImpl);
+
+    expect(result?.format).toBe('Paperback');
+  });
+
   it('resolves the Swedish edition of the same book to a different language code', async () => {
     const fetchImpl = vi.fn(async (url: string) => {
       if (url.includes('openlibrary.org/isbn/')) {

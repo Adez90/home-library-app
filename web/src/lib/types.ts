@@ -36,6 +36,7 @@ export interface HouseholdBook {
     coverUrl: string | null
     volumeNumber: number | null
     language: string | null
+    format: string | null
     author: AuthorRef | null
     series: SeriesRef | null
   }
