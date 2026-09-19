@@ -91,8 +91,7 @@ Visit `https://library.yourdomain.com` — you should see the login screen.
 1. Register the first account. Leave the invite code blank — this creates your household and
    makes you its owner. If you set `REGISTRATION_SECRET` in step 3, enter it in the
    "Registration code" field (only shown when you're not using an invite code).
-2. Open your account (the register/login response, or a future "household settings" screen)
-   to get the invite code.
+2. Tap your household's name at the top of the page to open the invite code panel and copy it.
 3. Have your wife register with that invite code — she joins your household instead of
    creating her own, so you both see and edit the same library under separate logins. She does
    *not* need the registration code from step 1 for this.
