@@ -50,3 +50,32 @@ test('search filters the library grid', async ({ page }) => {
   await page.getByPlaceholder('Search your books…').fill('Nonexistent Title Xyz');
   await expect(page.getByText('Salt and Ember')).toHaveCount(0);
 });
+
+test('bulk-selecting books removes all of them from the library at once', async ({ page }) => {
+  await addBook(page, { title: 'The Glass Orchard', author: 'R. Petrov' });
+  await addBook(page, { title: 'A Winter for Wolves', author: 'R. Petrov' });
+  await page.goto('/library');
+  await expect(page.getByText('The Glass Orchard').first()).toBeVisible();
+  await expect(page.getByText('A Winter for Wolves').first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Select' }).click();
+  await page.getByRole('button', { name: /The Glass Orchard/ }).click();
+  await page.getByRole('button', { name: /A Winter for Wolves/ }).click();
+  await expect(page.getByText('2 selected')).toBeVisible();
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Remove' }).click();
+
+  await expect(page.getByText('The Glass Orchard')).toHaveCount(0);
+  await expect(page.getByText('A Winter for Wolves')).toHaveCount(0);
+});
+
+test('canceling select mode leaves the library untouched', async ({ page }) => {
+  await addBook(page, { title: 'The Last Lighthouse', author: 'M. Enge' });
+  await page.goto('/library');
+
+  await page.getByRole('button', { name: 'Select' }).click();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  await expect(page.getByRole('link', { name: /The Last Lighthouse/ })).toBeVisible();
+});

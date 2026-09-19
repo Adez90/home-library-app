@@ -95,4 +95,104 @@ describe('favorites', () => {
     });
     expect(res.statusCode).toBe(404);
   });
+
+  it('favorites an author by name with no existing book, at zero owned', async () => {
+    const { cookie } = await registerUser(app, 'byname@example.com');
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/favorites',
+      cookies: { session: cookie },
+      payload: { targetType: 'author', name: 'Brandon Sanderson' },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body.name).toBe('Brandon Sanderson');
+    expect(body.ownedCount).toBe(0);
+    expect(body.totalCount).toBeUndefined();
+  });
+
+  it('favorites a series by name with no existing book, at zero of zero', async () => {
+    const { cookie } = await registerUser(app, 'byname2@example.com');
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/favorites',
+      cookies: { session: cookie },
+      payload: { targetType: 'series', name: 'The Stormlight Archive' },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({ name: 'The Stormlight Archive', ownedCount: 0, totalCount: 0 });
+  });
+
+  it('reuses the same author when favorited by name twice, and rejects the duplicate', async () => {
+    const { cookie } = await registerUser(app, 'byname3@example.com');
+    const payload = { targetType: 'author' as const, name: 'Mira Voss' };
+
+    const first = await app.inject({ method: 'POST', url: '/favorites', cookies: { session: cookie }, payload });
+    expect(first.statusCode).toBe(201);
+
+    const second = await app.inject({ method: 'POST', url: '/favorites', cookies: { session: cookie }, payload });
+    expect(second.statusCode).toBe(409);
+  });
+
+  it('updates an author favorite’s owned count live once a book by them is scanned in', async () => {
+    const { cookie } = await registerUser(app, 'live@example.com');
+
+    const fav = await app.inject({
+      method: 'POST',
+      url: '/favorites',
+      cookies: { session: cookie },
+      payload: { targetType: 'author', name: 'Mira Voss' },
+    });
+    expect(fav.json().ownedCount).toBe(0);
+
+    vi.mocked(lookupByIsbn).mockResolvedValueOnce({
+      title: 'The Ember Road',
+      authorName: 'Mira Voss',
+      source: 'open-library',
+      isbn13: '9780000000501',
+    });
+    const added = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { isbn: '9780000000501' },
+    });
+    expect(added.statusCode).toBe(201);
+
+    const list = await app.inject({ method: 'GET', url: '/favorites', cookies: { session: cookie } });
+    expect(list.json()[0].ownedCount).toBe(1);
+  });
+
+  it('updates a series favorite’s completion live once a volume is scanned in', async () => {
+    const { cookie } = await registerUser(app, 'live2@example.com');
+
+    const fav = await app.inject({
+      method: 'POST',
+      url: '/favorites',
+      cookies: { session: cookie },
+      payload: { targetType: 'series', name: 'The Lantern Cycle' },
+    });
+    expect(fav.json()).toMatchObject({ ownedCount: 0, totalCount: 0 });
+
+    vi.mocked(lookupByIsbn).mockResolvedValueOnce({
+      title: 'Book 1',
+      seriesName: 'The Lantern Cycle',
+      volumeNumber: 1,
+      source: 'open-library',
+      isbn13: '9780000000502',
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { isbn: '9780000000502' },
+    });
+
+    const list = await app.inject({ method: 'GET', url: '/favorites', cookies: { session: cookie } });
+    expect(list.json()[0]).toMatchObject({ ownedCount: 1, totalCount: 1 });
+  });
 });

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../db.js';
 import { lookupByIsbn } from '../lib/metadata.js';
 import { getPrimaryHouseholdId } from '../lib/household.js';
+import { findOrCreateAuthor, findOrCreateSeries } from '../lib/catalog.js';
 
 const STATUSES = ['owned', 'wishlist', 'hunting'] as const;
 
@@ -26,14 +27,6 @@ const updateBookSchema = z.object({
 
 function normalizeIsbn(isbn: string) {
   return isbn.replace(/[^0-9Xx]/g, '');
-}
-
-async function findOrCreateAuthor(tx: Prisma.TransactionClient, name: string) {
-  return tx.author.upsert({ where: { name }, update: {}, create: { name } });
-}
-
-async function findOrCreateSeries(tx: Prisma.TransactionClient, name: string) {
-  return tx.series.upsert({ where: { name }, update: {}, create: { name } });
 }
 
 // Only reachable when there's no ISBN to key off (manual entry, or a scanned ISBN with no

@@ -67,5 +67,7 @@ export interface Favorite {
   id: string
   targetType: 'author' | 'series'
   targetId: string
-  name?: string
+  name: string
+  ownedCount: number
+  totalCount?: number
 }

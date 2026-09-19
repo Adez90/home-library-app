@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { BookCard } from './BookCard'
 import type { HouseholdBook } from '../lib/types'
 
@@ -34,5 +35,23 @@ describe('BookCard', () => {
     expect(screen.getByText('Mira Voss')).toBeInTheDocument()
     expect(screen.getByText('en')).toBeInTheDocument()
     expect(screen.getByRole('link')).toHaveAttribute('href', '/library/hb1')
+  })
+
+  it('renders as a selection toggle instead of a link when selectable, and calls onToggleSelect on click', async () => {
+    const user = userEvent.setup()
+    const onToggleSelect = vi.fn()
+
+    render(
+      <MemoryRouter>
+        <BookCard item={item} selectable selected={false} onToggleSelect={onToggleSelect} />
+      </MemoryRouter>,
+    )
+
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    const button = screen.getByRole('button')
+    expect(button).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(button)
+    expect(onToggleSelect).toHaveBeenCalledWith('hb1')
   })
 })

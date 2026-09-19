@@ -46,6 +46,11 @@ const en = {
     'library.filterHunting': 'Hunting',
     'library.empty': 'Nothing here yet.',
     'library.addFirstBook': 'Add your first book',
+    'library.select': 'Select',
+    'library.cancel': 'Cancel',
+    'library.selectedCount': '{count} selected',
+    'library.removeSelected': 'Remove',
+    'library.removeSelectedConfirm': 'Remove {count} book(s) from your library?',
 
     'addBook.title': 'Add a book',
     'addBook.scanBarcode': 'Scan barcode',
@@ -96,6 +101,14 @@ const en = {
     'wishlist.favoriteAuthor': 'Favorite author',
     'wishlist.favoriteSeries': 'Favorite series',
     'wishlist.removeFavorite': 'Remove favorite',
+    'wishlist.addFavorite': 'Watch for something new',
+    'wishlist.namePlaceholder': 'Author or series name',
+    'wishlist.typeAuthor': 'Author',
+    'wishlist.typeSeries': 'Series',
+    'wishlist.add': 'Add',
+    'wishlist.adding': 'Adding…',
+    'wishlist.alreadyFavorited': "You're already watching for that.",
+    'wishlist.ownedCount': '{count} owned',
 } as const;
 
 export type Lang = 'en' | 'sv';
@@ -151,6 +164,11 @@ const sv: Record<TranslationKey, string> = {
     'library.filterHunting': 'Letar efter',
     'library.empty': 'Inget här än.',
     'library.addFirstBook': 'Lägg till din första bok',
+    'library.select': 'Markera',
+    'library.cancel': 'Avbryt',
+    'library.selectedCount': '{count} markerade',
+    'library.removeSelected': 'Ta bort',
+    'library.removeSelectedConfirm': 'Ta bort {count} bok/böcker från ditt bibliotek?',
 
     'addBook.title': 'Lägg till en bok',
     'addBook.scanBarcode': 'Skanna streckkod',
@@ -201,6 +219,14 @@ const sv: Record<TranslationKey, string> = {
     'wishlist.favoriteAuthor': 'Favoritförfattare',
     'wishlist.favoriteSeries': 'Favoritserie',
     'wishlist.removeFavorite': 'Ta bort favorit',
+    'wishlist.addFavorite': 'Bevaka något nytt',
+    'wishlist.namePlaceholder': 'Författare eller serienamn',
+    'wishlist.typeAuthor': 'Författare',
+    'wishlist.typeSeries': 'Serie',
+    'wishlist.add': 'Lägg till',
+    'wishlist.adding': 'Lägger till…',
+    'wishlist.alreadyFavorited': 'Du bevakar redan det där.',
+    'wishlist.ownedCount': '{count} ägda',
 };
 
 export const translations: Record<Lang, Record<TranslationKey, string>> = { en, sv };

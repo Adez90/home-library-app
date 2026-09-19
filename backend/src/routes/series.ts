@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../db.js';
 import { getPrimaryHouseholdId } from '../lib/household.js';
+import { computeSlotCompletion } from '../lib/catalog.js';
 
 async function buildSeriesDetail(seriesId: string, householdId: string) {
   const series = await prisma.series.findUnique({ where: { id: seriesId } });
@@ -28,17 +29,7 @@ async function buildSeriesDetail(seriesId: string, householdId: string) {
     status: statusByBookId.get(book.id) ?? 'missing',
   }));
 
-  // A volume number can exist as several editions (languages) — each is its own catalog
-  // row, but they represent the same "slot" in the story, so completion is counted once
-  // per slot: owned in ANY language counts. A book with no volume number (can't be grouped)
-  // is its own slot.
-  const slotKey = (v: (typeof volumes)[number]) => (v.volumeNumber != null ? `v:${v.volumeNumber}` : `id:${v.id}`);
-  const slots = new Map<string, boolean>();
-  for (const v of volumes) {
-    const key = slotKey(v);
-    slots.set(key, (slots.get(key) ?? false) || v.status === 'owned');
-  }
-  const ownedCount = [...slots.values()].filter(Boolean).length;
+  const { ownedCount, totalCount } = computeSlotCompletion(volumes);
   const languages = [...new Set(volumes.map((v) => v.language).filter((l): l is string => !!l))].sort();
 
   return {
@@ -46,7 +37,7 @@ async function buildSeriesDetail(seriesId: string, householdId: string) {
     name: series.name,
     volumes,
     ownedCount,
-    totalCount: slots.size,
+    totalCount,
     languages,
   };
 }
