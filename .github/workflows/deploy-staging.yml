@@ -1,0 +1,109 @@
+name: deploy-staging
+
+# Self-contained on purpose: re-runs the same fast checks as backend-ci/web-ci/e2e-ci rather
+# than trying to wait on those (path-filtered, so "all three succeeded for this push" isn't
+# even always well-defined) — this is the one source of truth for "is main deployable right
+# now", and it runs on every push to main regardless of which paths changed, since a Docker
+# rebuild bundles everything together anyway.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: library
+          POSTGRES_PASSWORD: library
+          POSTGRES_DB: library
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U library"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://library:library@localhost:5432/library
+      JWT_SECRET: ci-test-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm install
+      - run: npx prisma migrate deploy --schema backend/prisma/schema.prisma
+      - run: npx tsc -p backend/tsconfig.json --noEmit
+      - run: npm test --workspace backend
+
+  web-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm install
+      - run: npx tsc -b web
+      - run: npm test --workspace web
+      - run: npm run build --workspace web
+
+  e2e-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: library
+          POSTGRES_PASSWORD: library
+          POSTGRES_DB: library_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U library"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://library:library@localhost:5432/library_e2e
+      E2E_DATABASE_URL: postgresql://library:library@localhost:5432/library_e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm install
+      - run: npx playwright install --with-deps chromium
+      - run: npx prisma migrate deploy --schema backend/prisma/schema.prisma
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [backend-test, web-test, e2e-test]
+    steps:
+      - name: Pull and rebuild on the staging server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/home-library-app
+            git pull
+            docker compose up -d --build
