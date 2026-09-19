@@ -1,0 +1,55 @@
+name: docker-smoke-ci
+
+# Builds and runs the actual production docker-compose stack (the real Dockerfiles, the real
+# nginx.conf) and hits it over HTTP, the same way a browser or Caddy would. None of the other
+# CI workflows do this — they run against tsx/Vite dev servers, which don't go anywhere near
+# Docker, Alpine's OpenSSL, or nginx's reverse-proxy config. All three of those layers have
+# broken in ways only visible once actually deployed; this catches that class of bug on every
+# push instead of the next real deployment.
+on:
+  push:
+  pull_request:
+  workflow_call:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write a CI-only .env
+        run: |
+          cat > .env <<EOF
+          POSTGRES_PASSWORD=ci-postgres-password
+          JWT_SECRET=ci-jwt-secret
+          REGISTRATION_SECRET=ci-registration-secret
+          EOF
+
+      - name: Build and start the stack
+        run: docker compose up -d --build
+
+      - name: Wait for the api to come up healthy
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8080/api/health > /dev/null; then
+              echo "api is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "api never became healthy within 60s"
+          exit 1
+
+      - name: Verify the health payload through nginx, the same path a browser takes
+        run: |
+          body="$(curl -s http://127.0.0.1:8080/api/health)"
+          echo "$body"
+          echo "$body" | grep -q '"status":"ok"'
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

@@ -92,9 +92,12 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+  docker-smoke:
+    uses: ./.github/workflows/docker-smoke-ci.yml
+
   deploy:
     runs-on: ubuntu-latest
-    needs: [backend-test, web-test, e2e-test]
+    needs: [backend-test, web-test, e2e-test, docker-smoke]
     steps:
       - name: Pull and rebuild on the staging server
         uses: appleboy/ssh-action@v1.0.3
