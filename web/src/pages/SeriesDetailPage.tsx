@@ -14,11 +14,26 @@ export function SeriesDetailPage() {
   const [favoriting, setFavoriting] = useState(false)
   const [favorited, setFavorited] = useState(false)
   const [languageFilter, setLanguageFilter] = useState<string | 'all'>('all')
+  const [editingCount, setEditingCount] = useState(false)
+  const [countInput, setCountInput] = useState('')
+  const [savingCount, setSavingCount] = useState(false)
 
   useEffect(() => {
     if (!id) return
     api.get<SeriesDetail>(`/series/${id}`).then(setSeries)
   }, [id])
+
+  async function saveExpectedVolumeCount(value: number | null) {
+    if (!series) return
+    setSavingCount(true)
+    try {
+      const updated = await api.patch<SeriesDetail>(`/series/${series.id}`, { expectedVolumeCount: value })
+      setSeries(updated)
+      setEditingCount(false)
+    } finally {
+      setSavingCount(false)
+    }
+  }
 
   async function favoriteSeries() {
     if (!series) return
@@ -71,6 +86,54 @@ export function SeriesDetailPage() {
         <div className="h-2 rounded-full bg-border overflow-hidden">
           <div className="h-full bg-success" style={{ width: `${pct}%` }} />
         </div>
+
+        {editingCount ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              const trimmed = countInput.trim()
+              saveExpectedVolumeCount(trimmed ? Number(trimmed) : null)
+            }}
+            className="flex items-center gap-2 mt-2"
+          >
+            <input
+              type="number"
+              min={1}
+              autoFocus
+              value={countInput}
+              onChange={(e) => setCountInput(e.target.value)}
+              placeholder={t('series.totalVolumesPlaceholder')}
+              className="w-24 rounded-lg border border-border px-2 py-1 text-xs"
+            />
+            <button type="submit" disabled={savingCount} className="text-xs text-accent font-medium">
+              {t('common.save')}
+            </button>
+            <button type="button" onClick={() => setEditingCount(false)} className="text-xs text-text-secondary">
+              {t('common.cancel')}
+            </button>
+            {series.expectedVolumeCount != null && (
+              <button
+                type="button"
+                onClick={() => saveExpectedVolumeCount(null)}
+                disabled={savingCount}
+                className="text-xs text-text-secondary underline"
+              >
+                {t('series.clearTotal')}
+              </button>
+            )}
+          </form>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setCountInput(series.expectedVolumeCount != null ? String(series.expectedVolumeCount) : '')
+              setEditingCount(true)
+            }}
+            className="text-xs text-accent font-medium mt-2"
+          >
+            {series.expectedVolumeCount != null ? t('series.editTotal') : t('series.setTotal')}
+          </button>
+        )}
       </div>
 
       {series.languages.length > 1 && (
@@ -102,8 +165,8 @@ export function SeriesDetailPage() {
           <div key={v.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5">
             <div className="flex-1 text-sm font-semibold flex items-center gap-2">
               <span>
-                {v.volumeNumber != null ? `${t('common.bookNumber', { n: v.volumeNumber })}: ` : ''}
-                {v.title}
+                {v.volumeNumber != null ? t('common.bookNumber', { n: v.volumeNumber }) : ''}
+                {v.title ? `${v.volumeNumber != null ? ': ' : ''}${v.title}` : ''}
               </span>
               <LanguageBadge language={v.language} />
             </div>

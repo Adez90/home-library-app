@@ -14,6 +14,8 @@ const en = {
     'common.optional': '(optional)',
     'common.somethingWentWrong': 'Something went wrong. Try again.',
     'common.bookNumber': 'Book {n}',
+    'common.save': 'Save',
+    'common.cancel': 'Cancel',
 
     'login.title': 'Welcome back',
     'login.subtitle': 'Log in to your household library.',
@@ -111,6 +113,10 @@ const en = {
     'series.owned': '{owned} of {total} owned',
     'series.allSeries': 'All series',
     'series.allLanguages': 'All languages',
+    'series.setTotal': 'Set total volumes',
+    'series.editTotal': 'Edit total volumes',
+    'series.clearTotal': 'Clear (infer from highest volume)',
+    'series.totalVolumesPlaceholder': 'Total volumes',
 
     'wishlist.title': 'Wishlist',
     'wishlist.missingAndWanted': 'Missing & wanted',
@@ -151,6 +157,8 @@ const sv: Record<TranslationKey, string> = {
     'common.optional': '(valfritt)',
     'common.somethingWentWrong': 'Något gick fel. Försök igen.',
     'common.bookNumber': 'Bok {n}',
+    'common.save': 'Spara',
+    'common.cancel': 'Avbryt',
 
     'login.title': 'Välkommen tillbaka',
     'login.subtitle': 'Logga in på ditt hushålls bibliotek.',
@@ -248,6 +256,10 @@ const sv: Record<TranslationKey, string> = {
     'series.owned': '{owned} av {total} ägda',
     'series.allSeries': 'Alla serier',
     'series.allLanguages': 'Alla språk',
+    'series.setTotal': 'Ange totalt antal volymer',
+    'series.editTotal': 'Ändra totalt antal volymer',
+    'series.clearTotal': 'Rensa (uppskatta från högsta volymnumret)',
+    'series.totalVolumesPlaceholder': 'Totalt antal volymer',
 
     'wishlist.title': 'Önskelista',
     'wishlist.missingAndWanted': 'Saknas & önskas',

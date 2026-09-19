@@ -163,4 +163,95 @@ describe('series completion', () => {
     });
     expect(res.statusCode).toBe(404);
   });
+
+  it('infers a minimum total from the highest volume number owned, with gaps shown as missing', async () => {
+    const { cookie } = await registerUser(app, 'onepiece@example.com');
+
+    vi.mocked(lookupByIsbn).mockResolvedValueOnce({
+      title: 'One Piece, Vol. 28',
+      authorName: 'Eiichiro Oda',
+      seriesName: 'One Piece',
+      volumeNumber: 28,
+      isbn13: '9780000000401',
+      source: 'open-library',
+    });
+    const owned = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { isbn: '9780000000401' },
+    });
+    expect(owned.statusCode).toBe(201);
+    const seriesId = owned.json().book.series.id;
+
+    const detail = await app.inject({ method: 'GET', url: `/series/${seriesId}`, cookies: { session: cookie } });
+    const body = detail.json();
+
+    // Nobody publishes a "volume 28" first — owning only that one still implies 28 volumes exist.
+    expect(body.ownedCount).toBe(1);
+    expect(body.totalCount).toBe(28);
+    expect(body.expectedVolumeCount).toBeNull();
+    expect(body.volumes).toHaveLength(28);
+    expect(body.volumes.filter((v: { status: string }) => v.status === 'missing')).toHaveLength(27);
+    const owned28 = body.volumes.find((v: { volumeNumber: number }) => v.volumeNumber === 28);
+    expect(owned28.status).toBe('owned');
+    expect(owned28.title).toBe('One Piece, Vol. 28');
+  });
+
+  it('lets a household set, clear, and be blocked from setting an unowned series expected volume count', async () => {
+    const { cookie } = await registerUser(app, 'setcount@example.com');
+
+    vi.mocked(lookupByIsbn).mockResolvedValueOnce({
+      title: 'Harry Potter and the Philosopher’s Stone',
+      authorName: 'J.K. Rowling',
+      seriesName: 'Harry Potter',
+      volumeNumber: 1,
+      isbn13: '9780000000501',
+      source: 'open-library',
+    });
+    const owned = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { isbn: '9780000000501' },
+    });
+    const seriesId = owned.json().book.series.id;
+
+    const set = await app.inject({
+      method: 'PATCH',
+      url: `/series/${seriesId}`,
+      cookies: { session: cookie },
+      payload: { expectedVolumeCount: 7 },
+    });
+    expect(set.statusCode).toBe(200);
+    expect(set.json().totalCount).toBe(7);
+    expect(set.json().expectedVolumeCount).toBe(7);
+
+    const cleared = await app.inject({
+      method: 'PATCH',
+      url: `/series/${seriesId}`,
+      cookies: { session: cookie },
+      payload: { expectedVolumeCount: null },
+    });
+    expect(cleared.statusCode).toBe(200);
+    expect(cleared.json().totalCount).toBe(1);
+    expect(cleared.json().expectedVolumeCount).toBeNull();
+
+    const invalid = await app.inject({
+      method: 'PATCH',
+      url: `/series/${seriesId}`,
+      cookies: { session: cookie },
+      payload: { expectedVolumeCount: 0 },
+    });
+    expect(invalid.statusCode).toBe(400);
+
+    const { cookie: otherCookie } = await registerUser(app, 'outsider@example.com');
+    const blocked = await app.inject({
+      method: 'PATCH',
+      url: `/series/${seriesId}`,
+      cookies: { session: otherCookie },
+      payload: { expectedVolumeCount: 7 },
+    });
+    expect(blocked.statusCode).toBe(404);
+  });
 });

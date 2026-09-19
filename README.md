@@ -145,7 +145,11 @@ email or password") aren't translated yet — only the static UI text.
   obvious duplicate case, but isn't fuzzy — "The Ember Road" and "the ember road " (trailing
   space) won't be caught by a typo-level mismatch. ISBN-based adds don't have this problem at
   all, since the ISBN itself is the dedup key.
-- Series pages only know about volumes someone has looked up or added; there's no external
-  "this series has 7 books" source yet (planned: Wikidata).
+- Series totals are inferred (at least as many volumes as the highest volume number owned —
+  nobody publishes a "volume 28" first) or set manually per series, editable anytime; there's
+  still no external "this series has 7 books" source, and deliberately so — Wikipedia/Wikidata
+  have no consistently structured field for it across franchises/languages, and it'd go stale
+  for any still-publishing series anyway. Series that aren't numbered at all (e.g. Harry Potter
+  by title, not "Book N") don't benefit from the inference — only the manual total helps there.
 - Open Library / Google Books lookups are unit-tested against fixtures, not live network calls,
   to keep CI fast and deterministic.

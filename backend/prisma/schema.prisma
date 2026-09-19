@@ -55,6 +55,11 @@ model Series {
   id         String  @id @default(uuid())
   name       String
   wikidataId String?
+  // Household-editable — no external source reliably has "how many volumes are in this
+  // series" (Wikipedia's format varies wildly per franchise/language and goes stale for
+  // ongoing series like most manga). Null means "unknown", falls back to inferring a
+  // minimum from the highest volume number actually scanned in (see computeSlotCompletion).
+  expectedVolumeCount Int?
 
   books Book[]
 

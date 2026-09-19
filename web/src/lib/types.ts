@@ -60,6 +60,7 @@ export interface SeriesDetail {
   volumes: SeriesVolume[]
   ownedCount: number
   totalCount: number
+  expectedVolumeCount: number | null
   languages: string[]
 }
 
