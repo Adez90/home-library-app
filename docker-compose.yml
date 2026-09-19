@@ -21,6 +21,13 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+    # Explicit and globally unique on purpose: `web` may be attached to another stack's Docker
+    # network too (see docker-compose.shared-proxy.yml), and a plain service-name alias like
+    # "api" is a real, easy name to collide with if that other stack also has a service called
+    # api — Docker's embedded DNS resolves an ambiguous short name across every network the
+    # asking container belongs to, silently picking one. A container name is unique host-wide,
+    # so nothing else can ever answer to it.
+    container_name: homelib-api
     restart: unless-stopped
     depends_on:
       db:
