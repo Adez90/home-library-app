@@ -31,6 +31,25 @@ test('changing status and saving a note persists after reload', async ({ page })
   expect(page.url()).toBe(url);
 });
 
+test('correcting wrong title/author on a book updates it in place', async ({ page }) => {
+  await addBook(page, { title: 'Mistyped Titel', author: 'Wrong Author' });
+
+  await page.getByRole('button', { name: 'Edit details' }).click();
+  const titleInput = page.getByLabel('Title', { exact: true });
+  await titleInput.fill('');
+  await titleInput.fill('The Correct Title');
+  const authorInput = page.getByLabel(/^Author/);
+  await authorInput.fill('');
+  await authorInput.fill('Right Author');
+  await page.getByRole('button', { name: 'Save' }).click();
+
+  await expect(page.getByRole('heading', { name: 'The Correct Title' })).toBeVisible();
+  await expect(page.getByText('Right Author', { exact: true })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'The Correct Title' })).toBeVisible();
+});
+
 test('removing a book takes it out of the library', async ({ page }) => {
   await addBook(page, { title: 'A Room of Ash', author: 'Nadia Krol' });
 

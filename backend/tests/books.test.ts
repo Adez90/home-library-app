@@ -258,4 +258,103 @@ describe('household books', () => {
     const res = await app.inject({ method: 'GET', url: '/household-books' });
     expect(res.statusCode).toBe(401);
   });
+
+  it('corrects wrong metadata on a book, visible to every household that owns it', async () => {
+    vi.mocked(lookupByIsbn).mockResolvedValueOnce({
+      title: 'Mistyped Titel',
+      authorName: 'Wrong Author',
+      source: 'open-library',
+      isbn13: '9780000000200',
+    });
+    const alice = await registerUser(app, 'alice-fix@example.com');
+    const bob = await registerUser(app, 'bob-fix@example.com');
+
+    const aliceAdd = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: alice.cookie },
+      payload: { isbn: '9780000000200' },
+    });
+    const bobAdd = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: bob.cookie },
+      payload: { isbn: '9780000000200' },
+    });
+    const bookId = aliceAdd.json().book.id;
+    expect(bobAdd.json().book.id).toBe(bookId);
+
+    const fixed = await app.inject({
+      method: 'PATCH',
+      url: `/books/${bookId}`,
+      cookies: { session: alice.cookie },
+      payload: { title: 'The Correct Title', authorName: 'Right Author', language: 'en' },
+    });
+    expect(fixed.statusCode).toBe(200);
+    expect(fixed.json()).toMatchObject({ title: 'The Correct Title', language: 'en' });
+    expect(fixed.json().author.name).toBe('Right Author');
+
+    const bobsCopy = await app.inject({
+      method: 'GET',
+      url: `/household-books/${bobAdd.json().id}`,
+      cookies: { session: bob.cookie },
+    });
+    expect(bobsCopy.json().book.title).toBe('The Correct Title');
+  });
+
+  it('sets series/volume and clears them again on a book', async () => {
+    const { cookie } = await registerUser(app, 'series-edit@example.com');
+    const added = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { title: 'Standalone Novel' },
+    });
+    const bookId = added.json().book.id;
+
+    const withSeries = await app.inject({
+      method: 'PATCH',
+      url: `/books/${bookId}`,
+      cookies: { session: cookie },
+      payload: { seriesName: 'The Lantern Cycle', volumeNumber: 2 },
+    });
+    expect(withSeries.statusCode).toBe(200);
+    expect(withSeries.json()).toMatchObject({ volumeNumber: 2 });
+    expect(withSeries.json().series.name).toBe('The Lantern Cycle');
+
+    const cleared = await app.inject({
+      method: 'PATCH',
+      url: `/books/${bookId}`,
+      cookies: { session: cookie },
+      payload: { seriesName: '' },
+    });
+    expect(cleared.statusCode).toBe(200);
+    expect(cleared.json().series).toBeNull();
+    expect(cleared.json().volumeNumber).toBeNull();
+  });
+
+  it('404s editing a book the household does not own', async () => {
+    vi.mocked(lookupByIsbn).mockResolvedValueOnce({
+      title: 'Someone Elses Book',
+      source: 'open-library',
+      isbn13: '9780000000201',
+    });
+    const owner = await registerUser(app, 'owner-fix@example.com');
+    const stranger = await registerUser(app, 'stranger-fix@example.com');
+
+    const added = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: owner.cookie },
+      payload: { isbn: '9780000000201' },
+    });
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/books/${added.json().book.id}`,
+      cookies: { session: stranger.cookie },
+      payload: { title: 'Hijacked' },
+    });
+    expect(res.statusCode).toBe(404);
+  });
 });

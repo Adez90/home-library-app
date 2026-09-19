@@ -25,6 +25,18 @@ const updateBookSchema = z.object({
   conditionNote: z.string().max(2000).optional(),
 });
 
+// All fields optional; a present-but-empty string clears that field (author/series/language/
+// cover). A book's title can't be cleared, only changed. volumeNumber is a number to set it,
+// or null to clear it.
+const updateBookDetailsSchema = z.object({
+  title: z.string().min(1).max(500).optional(),
+  authorName: z.string().max(200).optional(),
+  seriesName: z.string().max(200).optional(),
+  volumeNumber: z.union([z.coerce.number().int().positive(), z.null()]).optional(),
+  language: z.string().max(8).optional(),
+  coverUrl: z.string().max(2000).optional(),
+});
+
 function normalizeIsbn(isbn: string) {
   return isbn.replace(/[^0-9Xx]/g, '');
 }
@@ -52,6 +64,30 @@ async function findExistingBookByDetails(
 }
 
 const bookInclude = { author: true, series: true } as const;
+
+function serializeBook(book: {
+  id: string;
+  title: string;
+  isbn13: string | null;
+  isbn10: string | null;
+  coverUrl: string | null;
+  volumeNumber: number | null;
+  language: string | null;
+  author: { id: string; name: string } | null;
+  series: { id: string; name: string } | null;
+}) {
+  return {
+    id: book.id,
+    title: book.title,
+    isbn13: book.isbn13,
+    isbn10: book.isbn10,
+    coverUrl: book.coverUrl,
+    volumeNumber: book.volumeNumber,
+    language: book.language,
+    author: book.author,
+    series: book.series,
+  };
+}
 
 function serializeHouseholdBook(hb: {
   id: string;
@@ -273,5 +309,67 @@ export async function registerBookRoutes(app: FastifyInstance) {
 
     await prisma.householdBook.delete({ where: { id } });
     return reply.code(204).send();
+  });
+
+  // Corrects the shared catalog row itself (title/author/series/volume/language/cover), not
+  // household-specific state. Scanned or looked-up metadata is sometimes wrong — a misread
+  // barcode, or the source's own data error — and until now there was no way to fix it short
+  // of deleting and re-adding, which re-fetches the same wrong data for the same ISBN. Since
+  // the row is shared by ISBN across households, a correction here is visible to everyone who
+  // owns that book, which is the right outcome for data that was objectively wrong.
+  app.patch('/books/:id', async (request, reply) => {
+    const parsed = updateBookDetailsSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid input', details: parsed.error.flatten() });
+    }
+    const householdId = await getPrimaryHouseholdId(request.user.userId);
+    const { id } = request.params as { id: string };
+
+    const owned = await prisma.householdBook.findFirst({ where: { householdId, bookId: id } });
+    if (!owned) {
+      return reply.code(404).send({ error: 'Not found' });
+    }
+
+    const { title, authorName, seriesName, volumeNumber, language, coverUrl } = parsed.data;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const data: Prisma.BookUpdateInput = {};
+
+      if (title !== undefined) data.title = title.trim();
+
+      if (authorName !== undefined) {
+        const trimmed = authorName.trim();
+        if (trimmed) {
+          const author = await findOrCreateAuthor(tx, trimmed);
+          data.author = { connect: { id: author.id } };
+        } else {
+          data.author = { disconnect: true };
+        }
+      }
+
+      let clearingSeries = false;
+      if (seriesName !== undefined) {
+        const trimmed = seriesName.trim();
+        if (trimmed) {
+          const series = await findOrCreateSeries(tx, trimmed);
+          data.series = { connect: { id: series.id } };
+        } else {
+          data.series = { disconnect: true };
+          data.volumeNumber = null;
+          clearingSeries = true;
+        }
+      }
+
+      if (!clearingSeries && volumeNumber !== undefined) {
+        data.volumeNumber = volumeNumber;
+      }
+
+      if (language !== undefined) data.language = language.trim() || null;
+      if (coverUrl !== undefined) data.coverUrl = coverUrl.trim() || null;
+
+      return tx.book.update({ where: { id }, data, include: bookInclude });
+    });
+
+    return serializeBook(updated);
   });
 }

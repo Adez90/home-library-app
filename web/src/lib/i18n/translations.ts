@@ -86,6 +86,11 @@ const en = {
     'bookDetail.isbn': 'ISBN {isbn}',
     'bookDetail.remove': 'Remove from library',
     'bookDetail.removeConfirm': 'Remove this book from your library?',
+    'bookDetail.editDetails': 'Edit details',
+    'bookDetail.editHint': "Scanned or looked-up details wrong? Fix them here — the correction applies for everyone who has this book.",
+    'bookDetail.coverUrl': 'Cover image URL',
+    'bookDetail.saveDetails': 'Save',
+    'bookDetail.savingDetails': 'Saving…',
 
     'series.title': 'Series',
     'series.empty': 'No series yet — books you add that belong to a series will show up here.',
@@ -204,6 +209,11 @@ const sv: Record<TranslationKey, string> = {
     'bookDetail.isbn': 'ISBN {isbn}',
     'bookDetail.remove': 'Ta bort från biblioteket',
     'bookDetail.removeConfirm': 'Ta bort den här boken från ditt bibliotek?',
+    'bookDetail.editDetails': 'Redigera uppgifter',
+    'bookDetail.editHint': 'Är de skannade eller uppslagna uppgifterna fel? Rätta dem här — rättelsen gäller för alla som har den här boken.',
+    'bookDetail.coverUrl': 'Bild-URL för omslag',
+    'bookDetail.saveDetails': 'Spara',
+    'bookDetail.savingDetails': 'Sparar…',
 
     'series.title': 'Serier',
     'series.empty': 'Inga serier än — böcker du lägger till som tillhör en serie visas här.',

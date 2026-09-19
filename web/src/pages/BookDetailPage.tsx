@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../lib/api'
 import type { BookStatus, HouseholdBook } from '../lib/types'
@@ -23,6 +23,16 @@ export function BookDetailPage() {
   const [favoriting, setFavoriting] = useState(false)
   const [favorited, setFavorited] = useState(false)
 
+  const [editing, setEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editAuthor, setEditAuthor] = useState('')
+  const [editSeries, setEditSeries] = useState('')
+  const [editVolume, setEditVolume] = useState('')
+  const [editLanguage, setEditLanguage] = useState('')
+  const [editCoverUrl, setEditCoverUrl] = useState('')
+  const [savingDetails, setSavingDetails] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
   useEffect(() => {
     if (!id) return
     api.get<HouseholdBook>(`/household-books/${id}`).then((data) => {
@@ -30,6 +40,51 @@ export function BookDetailPage() {
       setNote(data.conditionNote ?? '')
     })
   }, [id])
+
+  function startEditing() {
+    if (!item) return
+    setEditTitle(item.book.title)
+    setEditAuthor(item.book.author?.name ?? '')
+    setEditSeries(item.book.series?.name ?? '')
+    setEditVolume(item.book.volumeNumber != null ? String(item.book.volumeNumber) : '')
+    setEditLanguage(item.book.language ?? '')
+    setEditCoverUrl(item.book.coverUrl ?? '')
+    setEditError(null)
+    setEditing(true)
+  }
+
+  async function saveDetails(e: FormEvent) {
+    e.preventDefault()
+    if (!item) return
+    const trimmedTitle = editTitle.trim()
+    if (!trimmedTitle) return
+
+    const trimmedSeries = editSeries.trim()
+    const payload: Record<string, string | number | null> = {
+      title: trimmedTitle,
+      authorName: editAuthor.trim(),
+      seriesName: trimmedSeries,
+      language: editLanguage.trim(),
+      coverUrl: editCoverUrl.trim(),
+    }
+    if (trimmedSeries) {
+      if (editVolume.trim()) payload.volumeNumber = Number(editVolume)
+    } else {
+      payload.volumeNumber = null
+    }
+
+    setSavingDetails(true)
+    setEditError(null)
+    try {
+      const updatedBook = await api.patch<HouseholdBook['book']>(`/books/${item.book.id}`, payload)
+      setItem({ ...item, book: updatedBook })
+      setEditing(false)
+    } catch (err) {
+      setEditError(err instanceof ApiError ? err.message : t('common.somethingWentWrong'))
+    } finally {
+      setSavingDetails(false)
+    }
+  }
 
   async function updateStatus(status: BookStatus) {
     if (!item) return
@@ -94,34 +149,121 @@ export function BookDetailPage() {
         </div>
       </div>
 
-      <div className="text-center">
-        <div className="flex items-center justify-center gap-2">
-          <h1 className="font-heading text-xl font-bold">{book.title}</h1>
-          <LanguageBadge language={book.language} />
-        </div>
-        {book.author && (
-          <div className="flex items-center justify-center gap-2 text-sm text-text-secondary mt-1">
-            {book.author.name}
+      {editing ? (
+        <form onSubmit={saveDetails} className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
+          <p className="text-xs text-text-secondary">{t('bookDetail.editHint')}</p>
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            {t('addBook.titleLabel')}
+            <input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            {t('addBook.author')} <span className="text-text-secondary font-normal">{t('common.optional')}</span>
+            <input
+              value={editAuthor}
+              onChange={(e) => setEditAuthor(e.target.value)}
+              className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
+            />
+          </label>
+          <div className="flex gap-3">
+            <label className="flex flex-col gap-1 text-sm font-medium flex-1">
+              {t('addBook.series')} <span className="text-text-secondary font-normal">{t('common.optional')}</span>
+              <input
+                value={editSeries}
+                onChange={(e) => setEditSeries(e.target.value)}
+                placeholder={t('addBook.seriesPlaceholder')}
+                className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-medium w-20">
+              {t('addBook.bookNumber')}
+              <input
+                type="number"
+                min={1}
+                value={editVolume}
+                onChange={(e) => setEditVolume(e.target.value)}
+                className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
+              />
+            </label>
+          </div>
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            {t('addBook.language')} <span className="text-text-secondary font-normal">{t('common.optional')}</span>
+            <input
+              list="edit-language-options"
+              value={editLanguage}
+              onChange={(e) => setEditLanguage(e.target.value)}
+              placeholder={t('addBook.languagePlaceholder')}
+              className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
+            />
+            <datalist id="edit-language-options">
+              <option value="en">{t('addBook.languageEnglish')}</option>
+              <option value="sv">{t('addBook.languageSwedish')}</option>
+            </datalist>
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            {t('bookDetail.coverUrl')} <span className="text-text-secondary font-normal">{t('common.optional')}</span>
+            <input
+              value={editCoverUrl}
+              onChange={(e) => setEditCoverUrl(e.target.value)}
+              className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
+            />
+          </label>
+
+          {editError && <p className="text-sm text-danger">{editError}</p>}
+
+          <div className="flex gap-2">
             <button
               type="button"
-              onClick={favoriteAuthor}
-              disabled={favoriting || favorited}
-              aria-label={t('wishlist.favoriteAuthor')}
+              onClick={() => setEditing(false)}
+              className="flex-1 rounded-lg border border-border text-sm font-semibold py-2"
             >
-              <HeartIcon width={14} height={14} filled={favorited} className={favorited ? 'text-accent' : ''} />
+              {t('library.cancel')}
+            </button>
+            <button
+              type="submit"
+              disabled={savingDetails || !editTitle.trim()}
+              className="flex-1 rounded-lg bg-accent text-white text-sm font-semibold py-2 disabled:opacity-50"
+            >
+              {savingDetails ? t('bookDetail.savingDetails') : t('bookDetail.saveDetails')}
             </button>
           </div>
-        )}
-        {book.series && (
-          <Link
-            to={`/series/${book.series.id}`}
-            className="inline-block mt-2 rounded-full border border-border px-3 py-1 text-xs font-semibold"
-          >
-            {book.series.name}
-            {book.volumeNumber != null ? ` · ${t('common.bookNumber', { n: book.volumeNumber })}` : ''}
-          </Link>
-        )}
-      </div>
+        </form>
+      ) : (
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-2">
+            <h1 className="font-heading text-xl font-bold">{book.title}</h1>
+            <LanguageBadge language={book.language} />
+          </div>
+          {book.author && (
+            <div className="flex items-center justify-center gap-2 text-sm text-text-secondary mt-1">
+              {book.author.name}
+              <button
+                type="button"
+                onClick={favoriteAuthor}
+                disabled={favoriting || favorited}
+                aria-label={t('wishlist.favoriteAuthor')}
+              >
+                <HeartIcon width={14} height={14} filled={favorited} className={favorited ? 'text-accent' : ''} />
+              </button>
+            </div>
+          )}
+          {book.series && (
+            <Link
+              to={`/series/${book.series.id}`}
+              className="inline-block mt-2 rounded-full border border-border px-3 py-1 text-xs font-semibold"
+            >
+              {book.series.name}
+              {book.volumeNumber != null ? ` · ${t('common.bookNumber', { n: book.volumeNumber })}` : ''}
+            </Link>
+          )}
+          <button type="button" onClick={startEditing} className="block mx-auto mt-2 text-xs text-accent font-medium">
+            {t('bookDetail.editDetails')}
+          </button>
+        </div>
+      )}
 
       <div className="flex justify-center gap-2">
         {STATUS_OPTIONS.map((opt) => (
