@@ -6,6 +6,15 @@ import type { HouseholdBook } from '../lib/types'
 import { ScanIcon } from '../components/icons'
 import { useTranslation } from '../lib/i18n'
 
+type ScanMode = 'single' | 'shelf'
+type ShelfResultStatus = 'pending' | 'added' | 'duplicate' | 'notFound' | 'error'
+
+interface ShelfResult {
+  isbn: string
+  status: ShelfResultStatus
+  title?: string
+}
+
 export function AddBookPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
@@ -21,9 +30,17 @@ export function AddBookPage() {
   const [submitting, setSubmitting] = useState(false)
 
   const [scanning, setScanning] = useState(false)
+  const [scanMode, setScanMode] = useState<ScanMode>('single')
   const [scanError, setScanError] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+
+  // Shelf mode: every detected code is submitted immediately instead of just filling the form,
+  // so the camera can stay open and rack through a whole shelf. This set is per-session — it
+  // only stops the same physical book (still sitting in frame across many video frames) from
+  // being submitted over and over, not a real duplicate scanned on a later shelf-scan session.
+  const [shelfResults, setShelfResults] = useState<ShelfResult[]>([])
+  const shelfSeenRef = useRef<Set<string>>(new Set())
 
   // The camera itself (getUserMedia) is the real requirement — barcode decoding runs via the
   // barcode-detector ponyfill (zxing-wasm), which works the same in every modern browser
@@ -55,9 +72,16 @@ export function AddBookPage() {
       try {
         const codes = await detector.detect(video)
         if (codes.length > 0) {
-          setIsbn(codes[0].rawValue)
-          stopScan()
-          return
+          const code = codes[0].rawValue
+          if (scanMode === 'single') {
+            setIsbn(code)
+            stopScan()
+            return
+          }
+          if (!shelfSeenRef.current.has(code)) {
+            shelfSeenRef.current.add(code)
+            addShelfScan(code)
+          }
         }
       } catch {
         // keep trying on transient detector errors
@@ -69,10 +93,15 @@ export function AddBookPage() {
     return () => {
       cancelled = true
     }
-  }, [scanning])
+  }, [scanning, scanMode])
 
-  async function startScan() {
+  async function startScan(mode: ScanMode) {
     setScanError(null)
+    if (mode === 'shelf') {
+      shelfSeenRef.current = new Set()
+      setShelfResults([])
+    }
+    setScanMode(mode)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
       streamRef.current = stream
@@ -87,6 +116,29 @@ export function AddBookPage() {
     streamRef.current?.getTracks().forEach((track) => track.stop())
     streamRef.current = null
     setScanning(false)
+  }
+
+  async function addShelfScan(code: string) {
+    setShelfResults((prev) => [{ isbn: code, status: 'pending' }, ...prev])
+    try {
+      const added = await api.post<HouseholdBook>('/household-books', { isbn: code })
+      setShelfResults((prev) =>
+        prev.map((r) => (r.isbn === code ? { isbn: code, status: 'added', title: added.book.title } : r)),
+      )
+    } catch (err) {
+      const status: ShelfResultStatus =
+        err instanceof ApiError && err.status === 409
+          ? 'duplicate'
+          : err instanceof ApiError && err.status === 404
+            ? 'notFound'
+            : 'error'
+      setShelfResults((prev) => prev.map((r) => (r.isbn === code ? { ...r, status } : r)))
+    }
+  }
+
+  function fillManualEntryFromScan(code: string) {
+    setIsbn(code)
+    setNeedsManualEntry(true)
   }
 
   async function onSubmit(e: FormEvent) {
@@ -125,28 +177,77 @@ export function AddBookPage() {
       <div className="rounded-xl border border-border bg-surface p-4 flex flex-col gap-3">
         {scanning ? (
           <div className="flex flex-col gap-3">
+            {scanMode === 'shelf' && <p className="text-xs text-text-secondary">{t('addBook.shelfScanHint')}</p>}
             <video ref={videoRef} className="w-full rounded-lg bg-black aspect-video" muted playsInline />
             <button
               type="button"
               onClick={stopScan}
               className="rounded-lg border border-border text-sm font-semibold py-2"
             >
-              {t('addBook.cancelScan')}
+              {scanMode === 'shelf' ? t('addBook.stopShelfScan') : t('addBook.cancelScan')}
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={startScan}
-            disabled={!scanSupported}
-            className="flex items-center justify-center gap-2 rounded-lg bg-text text-white text-sm font-semibold py-3 disabled:opacity-40"
-          >
-            <ScanIcon width={18} height={18} />
-            {t('addBook.scanBarcode')}
-          </button>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => startScan('single')}
+              disabled={!scanSupported}
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-text text-white text-sm font-semibold py-3 disabled:opacity-40"
+            >
+              <ScanIcon width={18} height={18} />
+              {t('addBook.scanBarcode')}
+            </button>
+            <button
+              type="button"
+              onClick={() => startScan('shelf')}
+              disabled={!scanSupported}
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-border text-sm font-semibold py-3 disabled:opacity-40"
+            >
+              <ScanIcon width={18} height={18} />
+              {t('addBook.scanShelf')}
+            </button>
+          </div>
         )}
         {!scanSupported && <p className="text-xs text-text-secondary">{t('addBook.scanUnsupported')}</p>}
         {scanError && <p className="text-xs text-danger">{scanError}</p>}
+
+        {shelfResults.length > 0 && (
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <p className="text-xs font-medium text-text-secondary">
+              {t('addBook.shelfSummary', {
+                added: shelfResults.filter((r) => r.status === 'added').length,
+                duplicate: shelfResults.filter((r) => r.status === 'duplicate').length,
+                notFound: shelfResults.filter((r) => r.status === 'notFound').length,
+              })}
+            </p>
+            <ul className="flex flex-col gap-1.5 max-h-64 overflow-y-auto">
+              {shelfResults.map((r) => (
+                <li
+                  key={`${r.isbn}-${r.status}`}
+                  className="flex items-center justify-between gap-2 rounded-lg bg-bg px-3 py-2 text-sm"
+                >
+                  <span className="truncate">
+                    {r.status === 'added' ? r.title : r.isbn}
+                  </span>
+                  {r.status === 'pending' && <span className="text-xs text-text-secondary shrink-0">{t('addBook.shelfPending')}</span>}
+                  {r.status === 'added' && <span className="text-xs text-accent shrink-0">{t('addBook.shelfAdded')}</span>}
+                  {r.status === 'duplicate' && <span className="text-xs text-text-secondary shrink-0">{t('addBook.shelfDuplicate')}</span>}
+                  {r.status === 'error' && <span className="text-xs text-danger shrink-0">{t('addBook.shelfError')}</span>}
+                  {r.status === 'notFound' && (
+                    <button
+                      type="button"
+                      onClick={() => fillManualEntryFromScan(r.isbn)}
+                      className="text-xs text-accent font-medium shrink-0 underline"
+                    >
+                      {t('addBook.shelfNotFound')}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">

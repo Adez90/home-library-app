@@ -31,7 +31,7 @@ mobile/    React Native app (later)
 - [x] Interface in English and Swedish, switchable anywhere, persisted per browser
 - [x] Security hardening: rate limiting, security headers, registration gate, required prod secrets
 - [x] End-to-end test suite (Playwright) covering real user flows, wired into CI
-- [ ] Multi-book shelf scan
+- [x] Multi-book shelf scan (camera stays open, scans are added automatically one after another)
 - [ ] Native app
 
 ## Local development
