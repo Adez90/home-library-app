@@ -179,10 +179,12 @@ export function BookDetailPage() {
               />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium w-20">
-              {t('addBook.bookNumber')}
+              {t('addBook.bookNumber')}{' '}
+              {editSeries.trim() && <span className="text-danger font-normal">{t('common.required')}</span>}
               <input
                 type="number"
                 min={1}
+                required={!!editSeries.trim()}
                 value={editVolume}
                 onChange={(e) => setEditVolume(e.target.value)}
                 className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
@@ -224,7 +226,7 @@ export function BookDetailPage() {
             </button>
             <button
               type="submit"
-              disabled={savingDetails || !editTitle.trim()}
+              disabled={savingDetails || !editTitle.trim() || (!!editSeries.trim() && !editVolume.trim())}
               className="flex-1 rounded-lg bg-accent text-white text-sm font-semibold py-2 disabled:opacity-50"
             >
               {savingDetails ? t('bookDetail.savingDetails') : t('bookDetail.saveDetails')}

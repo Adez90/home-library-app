@@ -127,6 +127,19 @@ describe('household books', () => {
     expect(body.book.volumeNumber).toBe(4);
   });
 
+  it('rejects a manual series name with no volume number', async () => {
+    const { cookie } = await registerUser(app, 'noseriesvolume@example.com');
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { title: 'Philosopher’s Stone', seriesName: 'Harry Potter' },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
   it('reuses the same catalog row when two different households manually add the identical book', async () => {
     const alice = await registerUser(app, 'alice@example.com');
     const bob = await registerUser(app, 'bob@example.com');
@@ -331,6 +344,43 @@ describe('household books', () => {
     expect(cleared.statusCode).toBe(200);
     expect(cleared.json().series).toBeNull();
     expect(cleared.json().volumeNumber).toBeNull();
+  });
+
+  it('rejects setting a series with no volume number, but allows renaming a series without repeating it', async () => {
+    const { cookie } = await registerUser(app, 'series-edit-guard@example.com');
+    const added = await app.inject({
+      method: 'POST',
+      url: '/household-books',
+      cookies: { session: cookie },
+      payload: { title: 'Standalone Novel Two' },
+    });
+    const bookId = added.json().book.id;
+
+    const rejected = await app.inject({
+      method: 'PATCH',
+      url: `/books/${bookId}`,
+      cookies: { session: cookie },
+      payload: { seriesName: 'Harry Potter' },
+    });
+    expect(rejected.statusCode).toBe(400);
+
+    const withSeries = await app.inject({
+      method: 'PATCH',
+      url: `/books/${bookId}`,
+      cookies: { session: cookie },
+      payload: { seriesName: 'Harry Potter', volumeNumber: 1 },
+    });
+    expect(withSeries.statusCode).toBe(200);
+
+    // Renaming the series without resending volumeNumber is fine — it's still set from before.
+    const renamed = await app.inject({
+      method: 'PATCH',
+      url: `/books/${bookId}`,
+      cookies: { session: cookie },
+      payload: { seriesName: 'Harry Potter and the Philosopher’s Stone' },
+    });
+    expect(renamed.statusCode).toBe(200);
+    expect(renamed.json().volumeNumber).toBe(1);
   });
 
   it('exports the household library as csv', async () => {

@@ -18,7 +18,17 @@ const addBookSchema = z
     language: z.string().min(2).max(8).optional(),
     status: z.enum(STATUSES).default('owned'),
   })
-  .refine((data) => data.isbn || data.title, { message: 'Provide either isbn or title' });
+  .refine((data) => data.isbn || data.title, { message: 'Provide either isbn or title' })
+  // Only guards the manual "Add series info" fields, not metadata resolved from an ISBN
+  // lookup — a scanned book with series info the metadata source didn't number shouldn't be
+  // rejected outright. But a person manually saying "this is part of a series" without saying
+  // where in it just silently orphans that book from series completion tracking (see
+  // computeSlotCompletion: no volume number means it can never match another edition's slot),
+  // so it's worth catching at the door instead.
+  .refine((data) => !data.seriesName || data.volumeNumber != null, {
+    message: 'A book number is required when adding series info',
+    path: ['volumeNumber'],
+  });
 
 const updateBookSchema = z.object({
   status: z.enum(STATUSES).optional(),
@@ -373,6 +383,20 @@ export async function registerBookRoutes(app: FastifyInstance) {
     }
 
     const { title, authorName, seriesName, volumeNumber, language, coverUrl } = parsed.data;
+
+    // Same rule as adding a book (see addBookSchema): setting a non-empty series without a
+    // book number silently orphans it from series completion tracking. This is a PATCH, so
+    // "no volume number" has to be checked against what the book ends up with, not just this
+    // request — someone might be renaming the series while leaving an already-set volumeNumber
+    // untouched, which is fine and shouldn't be rejected.
+    const trimmedSeriesName = seriesName?.trim();
+    if (trimmedSeriesName) {
+      const existing = await prisma.book.findUnique({ where: { id }, select: { volumeNumber: true } });
+      const resolvedVolumeNumber = volumeNumber !== undefined ? volumeNumber : existing?.volumeNumber;
+      if (resolvedVolumeNumber == null) {
+        return reply.code(400).send({ error: 'A book number is required when adding series info' });
+      }
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
       const data: Prisma.BookUpdateInput = {};

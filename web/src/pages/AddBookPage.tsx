@@ -309,10 +309,12 @@ export function AddBookPage() {
               />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium w-20">
-              {t('addBook.bookNumber')}
+              {t('addBook.bookNumber')}{' '}
+              {seriesName.trim() && <span className="text-danger font-normal">{t('common.required')}</span>}
               <input
                 type="number"
                 min={1}
+                required={!!seriesName.trim()}
                 value={volumeNumber}
                 onChange={(e) => setVolumeNumber(e.target.value)}
                 className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-2 focus:outline-accent"
@@ -333,7 +335,7 @@ export function AddBookPage() {
 
         <button
           type="submit"
-          disabled={submitting || (!isbn && !title)}
+          disabled={submitting || (!isbn && !title) || (!!seriesName.trim() && !volumeNumber.trim())}
           className="rounded-lg bg-accent text-white font-semibold py-2.5 text-sm disabled:opacity-50"
         >
           {submitting ? t('addBook.submitting') : t('addBook.submit')}

@@ -16,6 +16,7 @@ const en = {
     'common.bookNumber': 'Book {n}',
     'common.save': 'Save',
     'common.cancel': 'Cancel',
+    'common.required': '(required)',
 
     'login.title': 'Welcome back',
     'login.subtitle': 'Log in to your household library.',
@@ -159,6 +160,7 @@ const sv: Record<TranslationKey, string> = {
     'common.bookNumber': 'Bok {n}',
     'common.save': 'Spara',
     'common.cancel': 'Avbryt',
+    'common.required': '(krävs)',
 
     'login.title': 'Välkommen tillbaka',
     'login.subtitle': 'Logga in på ditt hushålls bibliotek.',

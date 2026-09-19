@@ -116,3 +116,19 @@ test('canceling select mode leaves the library untouched', async ({ page }) => {
 
   await expect(page.getByRole('link', { name: /The Last Lighthouse/ })).toBeVisible();
 });
+
+test('naming a series without a book number blocks submission until one is given', async ({ page }) => {
+  await page.goto('/add');
+  await page.getByLabel(/^Title/).fill('Harry Potter and the Philosopher’s Stone');
+  await page.getByRole('button', { name: '+ Add series info' }).click();
+  await page.getByLabel(/^Series/).fill('Harry Potter');
+
+  await expect(page.getByRole('button', { name: 'Add to library' })).toBeDisabled();
+
+  await page.getByLabel('Book #').fill('1');
+  await expect(page.getByRole('button', { name: 'Add to library' })).toBeEnabled();
+
+  await page.getByRole('button', { name: 'Add to library' }).click();
+  await page.waitForURL(/\/library\/.+/);
+  await expect(page.getByText('Harry Potter · Book 1')).toBeVisible();
+});
